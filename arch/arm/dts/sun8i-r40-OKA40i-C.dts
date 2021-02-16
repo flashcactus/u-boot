@@ -47,7 +47,7 @@
 #include <dt-bindings/gpio/gpio.h>
 
 / {
-	model = "Forlinx FETA40i-C";
+	model = "Forlinx OKA40i-C";
 	compatible = "forlinx,oka40i-c", "allwinner,sun8i-r40";
 
 	aliases {
@@ -72,23 +72,7 @@
 
 	leds {
 		compatible = "gpio-leds";
-/*
-		pwr-led {
-			label = "bananapi:red:pwr";
-			gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>;
-			default-state = "on";
-		};
 
-		user-led-green {
-			label = "bananapi:green:user";
-			gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>;
-		};
-
-		user-led-blue {
-			label = "bananapi:blue:user";
-			gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>;
-		};
-*/
 	};
 
 	reg_vcc5v0: vcc5v0 {
@@ -177,7 +161,7 @@
 	vmmc-supply = <&reg_dcdc1>;
 	vqmmc-supply = <&reg_dcdc1>;
 	bus-width = <4>;
-	cd-gpios = <&pio 8 11 GPIO_ACTIVE_LOW>; /* PI11/V24 */
+	cd-gpios = <&pio 8 11 GPIO_ACTIVE_LOW>; // PI11
 	status = "okay";
 };
 
@@ -193,7 +177,6 @@
 	vmmc-supply = <&reg_dcdc1>;
 	vqmmc-supply = <&reg_aldo2>;
 	bus-width = <8>;
-	non-removable;
 	status = "okay";
 };
 
@@ -214,6 +197,7 @@
 	vcc-pf-supply = <&reg_dldo4>;
 	vcc-pg-supply = <&reg_dldo1>;
 };
+
 
 &reg_aldo2 {
 	regulator-always-on;
@@ -256,6 +240,7 @@
 	regulator-name = "vdd-sys";
 };
 
+
 &reg_dcdc5 {
 	regulator-always-on;
 	regulator-min-microvolt = <1500000>;
@@ -269,13 +254,6 @@
 	regulator-max-microvolt = <3300000>;
 	regulator-name = "vcc-wifi-io"; // ?
 };
-
-/*
- * Our WiFi chip needs both DLDO2 and DLDO3 to be powered at the same
- * time, with the two being in sync, to be able to meet maximum power
- * consumption during transmits. Since this is not really supported
- * right now, just use the two as always on, and we will fix it later.
- */
 
 &reg_dldo2 {
 	// regulator-always-on;
