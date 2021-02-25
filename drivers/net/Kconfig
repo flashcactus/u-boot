@@ -37,6 +37,21 @@ config DM_MDIO_MUX
 	  This is currently implemented in net/mdio-mux-uclass.c
 	  Look in include/miiphy.h for details.
 
+config DM_DSA
+	bool "Enable Driver Model for DSA switches"
+	depends on DM_ETH && DM_MDIO
+	depends on PHY_FIXED
+	help
+	  Enable driver model for DSA switches
+
+	  Adds UCLASS_DSA class supporting switches that follow the Distributed
+	  Switch Architecture (DSA).  These switches rely on the presence of a
+	  management switch port connected to an Ethernet controller capable of
+	  receiving frames from the switch.  This host Ethernet controller is
+	  called the "master" Ethernet interface in DSA terminology.
+	  This is currently implemented in net/dsa-uclass.c, refer to
+	  include/net/dsa.h for API details.
+
 config MDIO_SANDBOX
 	depends on DM_MDIO && SANDBOX
 	default y
@@ -148,6 +163,13 @@ config BCMGENET
 	select PHYLIB
 	help
 	  This driver supports the BCMGENET Ethernet MAC.
+
+config CORTINA_NI_ENET
+	bool "Cortina-Access Ethernet driver"
+	depends on DM_ETH && CORTINA_PLATFORM
+	help
+	  This driver supports the Cortina-Access Ethernet MAC for
+	  all supported CAxxxx SoCs.
 
 config DWC_ETH_QOS
 	bool "Synopsys DWC Ethernet QOS device support"
@@ -399,6 +421,18 @@ config MACB_ZYNQ
 	  The Cadence MACB ethernet interface was used on Zynq platform.
 	  Say Y to enable support for the MACB/GEM in Zynq chip.
 
+config MT7620_ETH
+	bool "MediaTek MT7620 Ethernet Interface"
+	depends on SOC_MT7620
+	select PHYLIB
+	select DM_RESET
+	select DM_GPIO
+	select CLK
+	help
+	  The MediaTek MT7620 ethernet interface is used on MT7620 based
+	  boards. It has a built-in switch with two configurable ports which
+	  can connect to external PHY/MACs.
+
 config MT7628_ETH
 	bool "MediaTek MT7628 Ethernet Interface"
 	depends on SOC_MT7628
@@ -406,6 +440,37 @@ config MT7628_ETH
 	help
 	  The MediaTek MT7628 ethernet interface is used on MT7628 and
 	  MT7688 based boards.
+
+config NET_OCTEONTX
+	bool "OcteonTX Ethernet support"
+	depends on ARCH_OCTEONTX
+	depends on PCI_SRIOV
+	help
+	  You must select Y to enable network device support for
+	  OcteonTX SoCs. If unsure, say n
+
+config NET_OCTEONTX2
+	bool "OcteonTX2 Ethernet support"
+	depends on ARCH_OCTEONTX2
+	select OCTEONTX2_CGX_INTF
+	help
+	  You must select Y to enable network device support for
+	  OcteonTX2 SoCs. If unsure, say n
+
+config OCTEONTX_SMI
+	bool "OcteonTX SMI Device support"
+	depends on ARCH_OCTEONTX || ARCH_OCTEONTX2
+	help
+	  You must select Y to enable SMI controller support for
+	  OcteonTX or OcteonTX2 SoCs. If unsure, say n
+
+config OCTEONTX2_CGX_INTF
+	bool "OcteonTX2 CGX ATF interface support"
+	depends on ARCH_OCTEONTX2
+	default y if ARCH_OCTEONTX2
+	help
+	  You must select Y to enable CGX ATF interface support for
+	  OcteonTX2 SoCs. If unsure, say n
 
 config PCH_GBE
 	bool "Intel Platform Controller Hub EG20T GMAC driver"
@@ -431,6 +496,8 @@ config PCNET
 	help
 	  This driver supports AMD PCnet series fast ethernet family of
 	  PCI chipsets/adapters.
+
+source "drivers/net/qe/Kconfig"
 
 config RTL8139
 	bool "Realtek 8139 series Ethernet controller driver"
@@ -698,6 +765,13 @@ config MDIO_MUX_I2CREG
 	  This driver is used for MDIO muxes driven by writing to a register of
 	  an I2C chip.  The board it was developed for uses a mux controlled by
 	  on-board FPGA which in turn is accessed as a chip over I2C.
+
+config MDIO_IPQ4019
+	bool "Qualcomm IPQ4019 MDIO interface support"
+	depends on DM_MDIO
+	help
+	  This driver supports the MDIO interface found in Qualcomm
+	  IPQ40xx series Soc-s.
 
 config MVMDIO
 	bool "Marvell MDIO interface support"

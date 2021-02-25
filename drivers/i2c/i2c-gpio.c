@@ -18,8 +18,6 @@
 #define I2C_ACK		0
 #define I2C_NOACK	1
 
-DECLARE_GLOBAL_DATA_PTR;
-
 enum {
 	PIN_SDA = 0,
 	PIN_SCL,
@@ -300,7 +298,7 @@ static int i2c_gpio_probe(struct udevice *dev, uint chip, uint chip_flags)
 	i2c_gpio_send_stop(bus, delay);
 
 	debug("%s: bus: %d (%s) chip: %x flags: %x ret: %d\n",
-	      __func__, dev->seq, dev->name, chip, chip_flags, ret);
+	      __func__, dev_seq(dev), dev->name, chip, chip_flags, ret);
 
 	return ret;
 }
@@ -331,11 +329,9 @@ static int i2c_gpio_drv_probe(struct udevice *dev)
 	return 0;
 }
 
-static int i2c_gpio_ofdata_to_platdata(struct udevice *dev)
+static int i2c_gpio_of_to_plat(struct udevice *dev)
 {
 	struct i2c_gpio_bus *bus = dev_get_priv(dev);
-	const void *blob = gd->fdt_blob;
-	int node = dev_of_offset(dev);
 	int ret;
 
 	ret = gpio_request_list_by_name(dev, "gpios", bus->gpios,
@@ -343,12 +339,12 @@ static int i2c_gpio_ofdata_to_platdata(struct udevice *dev)
 	if (ret < 0)
 		goto error;
 
-	bus->udelay = fdtdec_get_int(blob, node, "i2c-gpio,delay-us",
-				     DEFAULT_UDELAY);
+	bus->udelay = dev_read_u32_default(dev, "i2c-gpio,delay-us",
+					   DEFAULT_UDELAY);
 
 	bus->get_sda = i2c_gpio_sda_get;
 	bus->set_sda = i2c_gpio_sda_set;
-	if (fdtdec_get_bool(blob, node, "i2c-gpio,scl-output-only"))
+	if (dev_read_bool(dev, "i2c-gpio,scl-output-only"))
 		bus->set_scl = i2c_gpio_scl_set_output_only;
 	else
 		bus->set_scl = i2c_gpio_scl_set;
@@ -375,7 +371,7 @@ U_BOOT_DRIVER(i2c_gpio) = {
 	.id	= UCLASS_I2C,
 	.of_match = i2c_gpio_ids,
 	.probe	= i2c_gpio_drv_probe,
-	.ofdata_to_platdata = i2c_gpio_ofdata_to_platdata,
-	.priv_auto_alloc_size = sizeof(struct i2c_gpio_bus),
+	.of_to_plat = i2c_gpio_of_to_plat,
+	.priv_auto	= sizeof(struct i2c_gpio_bus),
 	.ops	= &i2c_gpio_ops,
 };

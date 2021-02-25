@@ -44,6 +44,9 @@ struct udevice;
 
 #define PKTALIGN	ARCH_DMA_MINALIGN
 
+/* Number of packets processed together */
+#define ETH_PACKETS_BATCH_RECV	32
+
 /* ARP hardware address length */
 #define ARP_HLEN 6
 /*
@@ -112,7 +115,7 @@ enum eth_state_t {
  * @enetaddr: The Ethernet MAC address that is loaded from EEPROM or env
  * @phy_interface: PHY interface to use - see PHY_INTERFACE_MODE_...
  * @max_speed: Maximum speed of Ethernet connection supported by MAC
- * @priv_pdata: device specific platdata
+ * @priv_pdata: device specific plat
  */
 struct eth_pdata {
 	phys_addr_t iobase;
@@ -496,7 +499,13 @@ struct icmp_hdr {
  * maximum packet size and multiple of 32 bytes =  1536
  */
 #define PKTSIZE			1522
+#ifndef CONFIG_DM_DSA
 #define PKTSIZE_ALIGN		1536
+#else
+/* Maximum DSA tagging overhead (headroom and/or tailroom) */
+#define DSA_MAX_OVR		256
+#define PKTSIZE_ALIGN		(1536 + DSA_MAX_OVR)
+#endif
 
 /*
  * Maximum receive ring size; that is, the number of packets
@@ -551,7 +560,7 @@ extern int		net_restart_wrap;	/* Tried all network devices */
 
 enum proto_t {
 	BOOTP, RARP, ARP, TFTPGET, DHCP, PING, DNS, NFS, CDP, NETCONS, SNTP,
-	TFTPSRV, TFTPPUT, LINKLOCAL, FASTBOOT, WOL
+	TFTPSRV, TFTPPUT, LINKLOCAL, FASTBOOT, WOL, UDP
 };
 
 extern char	net_boot_file_name[1024];/* Boot File name */
@@ -593,7 +602,7 @@ extern int net_ntp_time_offset;			/* offset time from UTC */
 #endif
 
 /* Initialize the network adapter */
-void net_init(void);
+int net_init(void);
 int net_loop(enum proto_t);
 
 /* Load failed.	 Start again. */

@@ -49,6 +49,7 @@
 #if defined(CONFIG_MP) && defined(CONFIG_PPC)
 #include <asm/mp.h>
 #endif
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/sections.h>
 #include <dm/root.h>
@@ -215,8 +216,6 @@ static int announce_dram_init(void)
 static int show_dram_config(void)
 {
 	unsigned long long size;
-
-#ifdef CONFIG_NR_DRAM_BANKS
 	int i;
 
 	debug("\nRAM Configuration:\n");
@@ -229,9 +228,6 @@ static int show_dram_config(void)
 #endif
 	}
 	debug("\nDRAM:  ");
-#else
-	size = gd->ram_size;
-#endif
 
 	print_size(size, "");
 	board_add_ram_info(0);
@@ -242,10 +238,8 @@ static int show_dram_config(void)
 
 __weak int dram_init_banksize(void)
 {
-#if defined(CONFIG_NR_DRAM_BANKS) && defined(CONFIG_SYS_SDRAM_BASE)
-	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].start = gd->ram_base;
 	gd->bd->bi_dram[0].size = get_effective_memsize();
-#endif
 
 	return 0;
 }
@@ -399,6 +393,8 @@ static int reserve_video(void)
 	ret = video_reserve(&addr);
 	if (ret)
 		return ret;
+	debug("Reserving %luk for video at: %08lx\n",
+	      (unsigned long)gd->relocaddr - addr, addr);
 	gd->relocaddr = addr;
 #elif defined(CONFIG_LCD)
 #  ifdef CONFIG_FB_ADDR
@@ -508,14 +504,6 @@ static int reserve_board(void)
 	return 0;
 }
 
-static int setup_machine(void)
-{
-#ifdef CONFIG_MACH_TYPE
-	gd->bd->bi_arch_number = CONFIG_MACH_TYPE; /* board id for Linux */
-#endif
-	return 0;
-}
-
 static int reserve_global_data(void)
 {
 	gd->start_addr_sp = reserve_stack_aligned(sizeof(gd_t));
@@ -527,21 +515,21 @@ static int reserve_global_data(void)
 
 static int reserve_fdt(void)
 {
-#ifndef CONFIG_OF_EMBED
-	/*
-	 * If the device tree is sitting immediately above our image then we
-	 * must relocate it. If it is embedded in the data section, then it
-	 * will be relocated with other data.
-	 */
-	if (gd->fdt_blob) {
-		gd->fdt_size = ALIGN(fdt_totalsize(gd->fdt_blob), 32);
+	if (!IS_ENABLED(CONFIG_OF_EMBED)) {
+		/*
+		 * If the device tree is sitting immediately above our image
+		 * then we must relocate it. If it is embedded in the data
+		 * section, then it will be relocated with other data.
+		 */
+		if (gd->fdt_blob) {
+			gd->fdt_size = ALIGN(fdt_totalsize(gd->fdt_blob), 32);
 
-		gd->start_addr_sp = reserve_stack_aligned(gd->fdt_size);
-		gd->new_fdt = map_sysmem(gd->start_addr_sp, gd->fdt_size);
-		debug("Reserving %lu Bytes for FDT at: %08lx\n",
-		      gd->fdt_size, gd->start_addr_sp);
+			gd->start_addr_sp = reserve_stack_aligned(gd->fdt_size);
+			gd->new_fdt = map_sysmem(gd->start_addr_sp, gd->fdt_size);
+			debug("Reserving %lu Bytes for FDT at: %08lx\n",
+			      gd->fdt_size, gd->start_addr_sp);
+		}
 	}
-#endif
 
 	return 0;
 }
@@ -580,8 +568,11 @@ static int reserve_stacks(void)
 static int reserve_bloblist(void)
 {
 #ifdef CONFIG_BLOBLIST
-	gd->start_addr_sp = reserve_stack_aligned(CONFIG_BLOBLIST_SIZE);
-	gd->new_bloblist = map_sysmem(gd->start_addr_sp, CONFIG_BLOBLIST_SIZE);
+	/* Align to a 4KB boundary for easier reading of addresses */
+	gd->start_addr_sp = ALIGN_DOWN(gd->start_addr_sp -
+				       CONFIG_BLOBLIST_SIZE_RELOC, 0x1000);
+	gd->new_bloblist = map_sysmem(gd->start_addr_sp,
+				      CONFIG_BLOBLIST_SIZE_RELOC);
 #endif
 
 	return 0;
@@ -603,13 +594,14 @@ int setup_bdinfo(void)
 {
 	struct bd_info *bd = gd->bd;
 
-	bd->bi_memstart = gd->ram_base;  /* start of memory */
-	bd->bi_memsize = gd->ram_size;   /* size in bytes */
-
 	if (IS_ENABLED(CONFIG_SYS_HAS_SRAM)) {
 		bd->bi_sramstart = CONFIG_SYS_SRAM_BASE; /* start of SRAM */
 		bd->bi_sramsize = CONFIG_SYS_SRAM_SIZE;  /* size  of SRAM */
 	}
+
+#ifdef CONFIG_MACH_TYPE
+	bd->bi_arch_number = CONFIG_MACH_TYPE; /* board id for Linux */
+#endif
 
 	return arch_setup_bdinfo();
 }
@@ -626,14 +618,15 @@ static int init_post(void)
 
 static int reloc_fdt(void)
 {
-#ifndef CONFIG_OF_EMBED
-	if (gd->flags & GD_FLG_SKIP_RELOC)
-		return 0;
-	if (gd->new_fdt) {
-		memcpy(gd->new_fdt, gd->fdt_blob, fdt_totalsize(gd->fdt_blob));
-		gd->fdt_blob = gd->new_fdt;
+	if (!IS_ENABLED(CONFIG_OF_EMBED)) {
+		if (gd->flags & GD_FLG_SKIP_RELOC)
+			return 0;
+		if (gd->new_fdt) {
+			memcpy(gd->new_fdt, gd->fdt_blob,
+			       fdt_totalsize(gd->fdt_blob));
+			gd->fdt_blob = gd->new_fdt;
+		}
 	}
-#endif
 
 	return 0;
 }
@@ -667,7 +660,8 @@ static int reloc_bloblist(void)
 
 		debug("Copying bloblist from %p to %p, size %x\n",
 		      gd->bloblist, gd->new_bloblist, size);
-		memcpy(gd->new_bloblist, gd->bloblist, size);
+		bloblist_reloc(gd->new_bloblist, CONFIG_BLOBLIST_SIZE_RELOC,
+			       gd->bloblist, size);
 		gd->bloblist = gd->new_bloblist;
 	}
 #endif
@@ -771,15 +765,6 @@ static int initf_bootstage(void)
 	return 0;
 }
 
-static int initf_console_record(void)
-{
-#if defined(CONFIG_CONSOLE_RECORD) && CONFIG_VAL(SYS_MALLOC_F_LEN)
-	return console_record_init();
-#else
-	return 0;
-#endif
-}
-
 static int initf_dm(void)
 {
 #if defined(CONFIG_DM) && CONFIG_VAL(SYS_MALLOC_F_LEN)
@@ -790,11 +775,12 @@ static int initf_dm(void)
 	bootstage_accum(BOOTSTAGE_ID_ACCUM_DM_F);
 	if (ret)
 		return ret;
-#endif
-#ifdef CONFIG_TIMER_EARLY
-	ret = dm_timer_init();
-	if (ret)
-		return ret;
+
+	if (IS_ENABLED(CONFIG_TIMER_EARLY)) {
+		ret = dm_timer_init();
+		if (ret)
+			return ret;
+	}
 #endif
 
 	return 0;
@@ -836,7 +822,9 @@ static const init_fnc_t init_sequence_f[] = {
 	bloblist_init,
 #endif
 	setup_spl_handoff,
-	initf_console_record,
+#if defined(CONFIG_CONSOLE_RECORD_INIT_F)
+	console_record_init,
+#endif
 #if defined(CONFIG_HAVE_FSP)
 	arch_fsp_init,
 #endif
@@ -928,7 +916,6 @@ static const init_fnc_t init_sequence_f[] = {
 	reserve_uboot,
 	reserve_malloc,
 	reserve_board,
-	setup_machine,
 	reserve_global_data,
 	reserve_fdt,
 	reserve_bootstage,

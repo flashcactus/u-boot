@@ -102,10 +102,6 @@
 /* Boot Argument Buffer Size */
 #define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
 
-#ifdef CONFIG_HUSH_PARSER
-#define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
-#endif
-
 /*-----------------------------------------------------------------------
  * Etc Command definition
  */
@@ -153,11 +149,6 @@
 #define CONFIG_VIDEO_LOGO
 
 #ifdef CONFIG_VIDEO_LOGO
-
-#ifdef CONFIG_DM_VIDEO
-#define CONFIG_BMP_24BPP
-#endif
-
 #ifdef CONFIG_SPLASH_SCREEN
 #define SPLASH_FILE			logo.bmp
 #endif

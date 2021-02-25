@@ -293,8 +293,8 @@ static int fit_image_read_data(char *filename, unsigned char *data,
 
 	/* Check file size */
 	if (sbuf.st_size != expected_size) {
-		printf("File %s don't have the expected size (size=%ld, expected=%d)\n",
-		       filename, sbuf.st_size, expected_size);
+		printf("File %s don't have the expected size (size=%lld, expected=%d)\n",
+		       filename, (long long)sbuf.st_size, expected_size);
 		goto err;
 	}
 
@@ -308,8 +308,8 @@ static int fit_image_read_data(char *filename, unsigned char *data,
 
 	/* Check that we have read all the file */
 	if (n != sbuf.st_size) {
-		printf("Can't read all file %s (read %zd bytes, expexted %ld)\n",
-		       filename, n, sbuf.st_size);
+		printf("Can't read all file %s (read %zd bytes, expexted %lld)\n",
+		       filename, n, (long long)sbuf.st_size);
 		goto err;
 	}
 
@@ -317,6 +317,36 @@ static int fit_image_read_data(char *filename, unsigned char *data,
 
 err:
 	close(fd);
+	return ret;
+}
+
+static int get_random_data(void *data, int size)
+{
+	unsigned char *tmp = data;
+	struct timespec date;
+	int i, ret = 0;
+
+	if (!tmp) {
+		printf("%s: pointer data is NULL\n", __func__);
+		ret = -1;
+		goto out;
+	}
+
+	ret = clock_gettime(CLOCK_MONOTONIC, &date);
+	if (ret < 0) {
+		printf("%s: clock_gettime has failed (err=%d, str=%s)\n",
+		       __func__, ret, strerror(errno));
+		goto out;
+	}
+
+	srandom(date.tv_nsec);
+
+	for (i = 0; i < size; i++) {
+		*tmp = random() & 0xff;
+		tmp++;
+	}
+
+ out:
 	return ret;
 }
 
@@ -345,13 +375,13 @@ static int fit_image_setup_cipher(struct image_cipher_info *info,
 		goto out;
 	}
 
-	/* Read the IV name */
+	/*
+	 * Read the IV name
+	 *
+	 * If this property is not provided then mkimage will generate
+	 * a random IV and store it in the FIT image
+	 */
 	info->ivname = fdt_getprop(fit, noffset, "iv-name-hint", NULL);
-	if (!info->ivname) {
-		printf("Can't get iv name for cipher in image '%s'\n",
-		       image_name);
-		goto out;
-	}
 
 	info->fit = fit;
 	info->node_noffset = noffset;
@@ -377,17 +407,23 @@ static int fit_image_setup_cipher(struct image_cipher_info *info,
 	if (ret < 0)
 		goto out;
 
-	/* Read the IV in the file */
-	snprintf(filename, sizeof(filename), "%s/%s%s",
-		 info->keydir, info->ivname, ".bin");
 	info->iv = malloc(info->cipher->iv_len);
 	if (!info->iv) {
 		printf("Can't allocate memory for iv\n");
 		ret = -1;
 		goto out;
 	}
-	ret = fit_image_read_data(filename, (unsigned char *)info->iv,
-				  info->cipher->iv_len);
+
+	if (info->ivname) {
+		/* Read the IV in the file */
+		snprintf(filename, sizeof(filename), "%s/%s%s",
+			 info->keydir, info->ivname, ".bin");
+		ret = fit_image_read_data(filename, (unsigned char *)info->iv,
+					  info->cipher->iv_len);
+	} else {
+		/* Generate an ramdom IV */
+		ret = get_random_data((void *)info->iv, info->cipher->iv_len);
+	}
 
  out:
 	return ret;
@@ -453,9 +489,10 @@ fit_image_process_cipher(const char *keydir, void *keydest, void *fit,
 	 * Write the public key into the supplied FDT file; this might fail
 	 * several times, since we try signing with successively increasing
 	 * size values
+	 * And, if needed, write the iv in the FIT file
 	 */
 	if (keydest) {
-		ret = info.cipher->add_cipher_data(&info, keydest);
+		ret = info.cipher->add_cipher_data(&info, keydest, fit, node_noffset);
 		if (ret) {
 			printf("Failed to add verification data for cipher '%s' in image '%s'\n",
 			       info.keyname, image_name);
@@ -663,13 +700,84 @@ static const char *fit_config_get_image_list(void *fit, int noffset,
 	return default_list;
 }
 
+static int fit_config_add_hash(void *fit, const char *conf_name, const char *sig_name,
+			       struct strlist *node_inc, const char *iname, int image_noffset)
+{
+	char name[200], path[200];
+	int noffset;
+	int hash_count;
+	int ret;
+
+	ret = fdt_get_path(fit, image_noffset, path, sizeof(path));
+	if (ret < 0)
+		goto err_path;
+	if (strlist_add(node_inc, path))
+		goto err_mem;
+
+	snprintf(name, sizeof(name), "%s/%s", FIT_CONFS_PATH,
+		 conf_name);
+
+	/* Add all this image's hashes */
+	hash_count = 0;
+	for (noffset = fdt_first_subnode(fit, image_noffset);
+	     noffset >= 0;
+	     noffset = fdt_next_subnode(fit, noffset)) {
+		const char *name = fit_get_name(fit, noffset, NULL);
+
+		if (strncmp(name, FIT_HASH_NODENAME,
+			    strlen(FIT_HASH_NODENAME)))
+			continue;
+		ret = fdt_get_path(fit, noffset, path, sizeof(path));
+		if (ret < 0)
+			goto err_path;
+		if (strlist_add(node_inc, path))
+			goto err_mem;
+		hash_count++;
+	}
+
+	if (!hash_count) {
+		printf("Failed to find any hash nodes in configuration '%s/%s' image '%s' - without these it is not possible to verify this image\n",
+		       conf_name, sig_name, iname);
+		return -ENOMSG;
+	}
+
+	/* Add this image's cipher node if present */
+	noffset = fdt_subnode_offset(fit, image_noffset,
+				     FIT_CIPHER_NODENAME);
+	if (noffset != -FDT_ERR_NOTFOUND) {
+		if (noffset < 0) {
+			printf("Failed to get cipher node in configuration '%s/%s' image '%s': %s\n",
+			       conf_name, sig_name, iname,
+			       fdt_strerror(noffset));
+			return -EIO;
+		}
+		ret = fdt_get_path(fit, noffset, path, sizeof(path));
+		if (ret < 0)
+			goto err_path;
+		if (strlist_add(node_inc, path))
+			goto err_mem;
+	}
+
+	return 0;
+
+err_mem:
+	printf("Out of memory processing configuration '%s/%s'\n", conf_name,
+	       sig_name);
+	return -ENOMEM;
+
+err_path:
+	printf("Failed to get path for image '%s' in configuration '%s/%s': %s\n",
+	       iname, conf_name, sig_name, fdt_strerror(ret));
+	return -ENOENT;
+}
+
 static int fit_config_get_hash_list(void *fit, int conf_noffset,
 				    int sig_offset, struct strlist *node_inc)
 {
 	int allow_missing;
 	const char *prop, *iname, *end;
 	const char *conf_name, *sig_name;
-	char name[200], path[200];
+	char name[200];
 	int image_count;
 	int ret, len;
 
@@ -696,72 +804,32 @@ static int fit_config_get_hash_list(void *fit, int conf_noffset,
 	end = prop + len;
 	image_count = 0;
 	for (iname = prop; iname < end; iname += strlen(iname) + 1) {
-		int noffset;
 		int image_noffset;
-		int hash_count;
+		int index, max_index;
 
-		image_noffset = fit_conf_get_prop_node(fit, conf_noffset,
-						       iname);
-		if (image_noffset < 0) {
-			printf("Failed to find image '%s' in  configuration '%s/%s'\n",
-			       iname, conf_name, sig_name);
-			if (allow_missing)
-				continue;
+		max_index = fdt_stringlist_count(fit, conf_noffset, iname);
 
-			return -ENOENT;
-		}
+		for (index = 0; index < max_index; index++) {
+			image_noffset = fit_conf_get_prop_node_index(fit, conf_noffset,
+								     iname, index);
 
-		ret = fdt_get_path(fit, image_noffset, path, sizeof(path));
-		if (ret < 0)
-			goto err_path;
-		if (strlist_add(node_inc, path))
-			goto err_mem;
+			if (image_noffset < 0) {
+				printf("Failed to find image '%s' in  configuration '%s/%s'\n",
+				       iname, conf_name, sig_name);
+				if (allow_missing)
+					continue;
 
-		snprintf(name, sizeof(name), "%s/%s", FIT_CONFS_PATH,
-			 conf_name);
-
-		/* Add all this image's hashes */
-		hash_count = 0;
-		for (noffset = fdt_first_subnode(fit, image_noffset);
-		     noffset >= 0;
-		     noffset = fdt_next_subnode(fit, noffset)) {
-			const char *name = fit_get_name(fit, noffset, NULL);
-
-			if (strncmp(name, FIT_HASH_NODENAME,
-				    strlen(FIT_HASH_NODENAME)))
-				continue;
-			ret = fdt_get_path(fit, noffset, path, sizeof(path));
-			if (ret < 0)
-				goto err_path;
-			if (strlist_add(node_inc, path))
-				goto err_mem;
-			hash_count++;
-		}
-
-		if (!hash_count) {
-			printf("Failed to find any hash nodes in configuration '%s/%s' image '%s' - without these it is not possible to verify this image\n",
-			       conf_name, sig_name, iname);
-			return -ENOMSG;
-		}
-
-		/* Add this image's cipher node if present */
-		noffset = fdt_subnode_offset(fit, image_noffset,
-					     FIT_CIPHER_NODENAME);
-		if (noffset != -FDT_ERR_NOTFOUND) {
-			if (noffset < 0) {
-				printf("Failed to get cipher node in configuration '%s/%s' image '%s': %s\n",
-				       conf_name, sig_name, iname,
-				       fdt_strerror(noffset));
-				return -EIO;
+				return -ENOENT;
 			}
-			ret = fdt_get_path(fit, noffset, path, sizeof(path));
-			if (ret < 0)
-				goto err_path;
-			if (strlist_add(node_inc, path))
-				goto err_mem;
-		}
 
-		image_count++;
+			ret = fit_config_add_hash(fit, conf_name,
+						  sig_name, node_inc,
+						  iname, image_noffset);
+			if (ret < 0)
+				return ret;
+
+			image_count++;
+		}
 	}
 
 	if (!image_count) {
@@ -776,11 +844,6 @@ err_mem:
 	printf("Out of memory processing configuration '%s/%s'\n", conf_name,
 	       sig_name);
 	return -ENOMEM;
-
-err_path:
-	printf("Failed to get path for image '%s' in configuration '%s/%s': %s\n",
-	       iname, conf_name, sig_name, fdt_strerror(ret));
-	return -ENOENT;
 }
 
 static int fit_config_get_data(void *fit, int conf_noffset, int noffset,

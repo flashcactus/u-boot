@@ -10,6 +10,7 @@
 #include <common.h>
 #include <eeprom.h>
 #include <image.h>
+#include <asm/global_data.h>
 #include <dm/uclass.h>
 #include <env.h>
 #include <fdt_support.h>
@@ -744,7 +745,7 @@ int board_late_init(void)
 #endif
 
 	/* Just probe the potentially supported cdce913 device */
-	uclass_get_device(UCLASS_CLK, 0, &dev);
+	uclass_get_device_by_name(UCLASS_CLK, "cdce913@65", &dev);
 
 	return 0;
 }

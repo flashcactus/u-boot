@@ -18,6 +18,13 @@ config MMC_WRITE
 	help
 	  Enable write access to MMC and SD Cards
 
+config MMC_PWRSEQ
+	bool "HW reset support for eMMC"
+	depends on PWRSEQ
+	help
+	  Ths select Hardware reset support aka pwrseq-emmc for eMMC
+	  devices.
+
 config MMC_BROKEN_CD
 	bool "Poll for broken card detection case"
 	help
@@ -45,6 +52,9 @@ config SPL_DM_MMC
 	  as EXT4 and FAT.
 
 if MMC
+
+config MMC_SDHCI_ADMA_HELPERS
+	bool
 
 config MMC_SPI
 	bool "Support for SPI-based MMC controller"
@@ -445,6 +455,7 @@ config MMC_SDHCI_SDMA
 config MMC_SDHCI_ADMA
 	bool "Support SDHCI ADMA2"
 	depends on MMC_SDHCI
+	select MMC_SDHCI_ADMA_HELPERS
 	help
 	  This enables support for the ADMA (Advanced DMA) defined
 	  in the SD Host Controller Standard Specification Version 3.00
@@ -452,6 +463,7 @@ config MMC_SDHCI_ADMA
 config SPL_MMC_SDHCI_ADMA
 	bool "Support SDHCI ADMA2 in SPL"
 	depends on MMC_SDHCI
+	select MMC_SDHCI_ADMA_HELPERS
 	help
 	  This enables support for the ADMA (Advanced DMA) defined
 	  in the SD Host Controller Standard Specification Version 3.00 in SPL.
@@ -521,6 +533,7 @@ config MMC_SDHCI_AM654
 	depends on MMC_SDHCI
 	depends on DM_MMC && OF_CONTROL && BLK
 	depends on REGMAP
+	select MMC_SDHCI_IO_ACCESSORS
 	help
 	  Support for Secure Digital Host Controller Interface (SDHCI)
 	  controllers present on TI's AM654 SOCs.
@@ -749,6 +762,14 @@ config FSL_ESDHC
 	help
 	  This selects support for the eSDHC (Enhanced Secure Digital Host
 	  Controller) found on numerous Freescale/NXP SoCs.
+
+config FSL_ESDHC_SUPPORT_ADMA2
+	bool "enable ADMA2 support"
+	depends on FSL_ESDHC
+	select MMC_SDHCI_ADMA_HELPERS
+	help
+	  This enables support for the ADMA2 transfer mode. If supported by the
+	  eSDHC it will allow 64bit DMA addresses.
 
 config FSL_ESDHC_33V_IO_RELIABILITY_WORKAROUND
 	bool "enable eSDHC workaround for 3.3v IO reliability issue"

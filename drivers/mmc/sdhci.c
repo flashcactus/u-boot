@@ -20,6 +20,7 @@
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
 #include <phys2bus.h>
+#include <power/regulator.h>
 
 static void sdhci_reset(struct sdhci_host *host, u8 mask)
 {
@@ -69,61 +70,11 @@ static void sdhci_transfer_pio(struct sdhci_host *host, struct mmc_data *data)
 	}
 }
 
-#if CONFIG_IS_ENABLED(MMC_SDHCI_ADMA)
-static void sdhci_adma_desc(struct sdhci_host *host, dma_addr_t dma_addr,
-			    u16 len, bool end)
-{
-	struct sdhci_adma_desc *desc;
-	u8 attr;
-
-	desc = &host->adma_desc_table[host->desc_slot];
-
-	attr = ADMA_DESC_ATTR_VALID | ADMA_DESC_TRANSFER_DATA;
-	if (!end)
-		host->desc_slot++;
-	else
-		attr |= ADMA_DESC_ATTR_END;
-
-	desc->attr = attr;
-	desc->len = len;
-	desc->reserved = 0;
-	desc->addr_lo = lower_32_bits(dma_addr);
-#ifdef CONFIG_DMA_ADDR_T_64BIT
-	desc->addr_hi = upper_32_bits(dma_addr);
-#endif
-}
-
-static void sdhci_prepare_adma_table(struct sdhci_host *host,
-				     struct mmc_data *data)
-{
-	uint trans_bytes = data->blocksize * data->blocks;
-	uint desc_count = DIV_ROUND_UP(trans_bytes, ADMA_MAX_LEN);
-	int i = desc_count;
-	dma_addr_t dma_addr = host->start_addr;
-
-	host->desc_slot = 0;
-
-	while (--i) {
-		sdhci_adma_desc(host, dma_addr, ADMA_MAX_LEN, false);
-		dma_addr += ADMA_MAX_LEN;
-		trans_bytes -= ADMA_MAX_LEN;
-	}
-
-	sdhci_adma_desc(host, dma_addr, trans_bytes, true);
-
-	flush_cache((dma_addr_t)host->adma_desc_table,
-		    ROUND(desc_count * sizeof(struct sdhci_adma_desc),
-			  ARCH_DMA_MINALIGN));
-}
-#elif defined(CONFIG_MMC_SDHCI_SDMA)
-static void sdhci_prepare_adma_table(struct sdhci_host *host,
-				     struct mmc_data *data)
-{}
-#endif
 #if (defined(CONFIG_MMC_SDHCI_SDMA) || CONFIG_IS_ENABLED(MMC_SDHCI_ADMA))
 static void sdhci_prepare_dma(struct sdhci_host *host, struct mmc_data *data,
 			      int *is_aligned, int trans_bytes)
 {
+	dma_addr_t dma_addr;
 	unsigned char ctrl;
 	void *buf;
 
@@ -154,10 +105,13 @@ static void sdhci_prepare_dma(struct sdhci_host *host, struct mmc_data *data,
 					  mmc_get_dma_dir(data));
 
 	if (host->flags & USE_SDMA) {
-		sdhci_writel(host, phys_to_bus((ulong)host->start_addr),
-				SDHCI_DMA_ADDRESS);
-	} else if (host->flags & (USE_ADMA | USE_ADMA64)) {
-		sdhci_prepare_adma_table(host, data);
+		dma_addr = dev_phys_to_bus(mmc_to_dev(host->mmc), host->start_addr);
+		sdhci_writel(host, dma_addr, SDHCI_DMA_ADDRESS);
+	}
+#if CONFIG_IS_ENABLED(MMC_SDHCI_ADMA)
+	else if (host->flags & (USE_ADMA | USE_ADMA64)) {
+		sdhci_prepare_adma_table(host->adma_desc_table, data,
+					 host->start_addr);
 
 		sdhci_writel(host, lower_32_bits(host->adma_addr),
 			     SDHCI_ADMA_ADDRESS);
@@ -165,6 +119,7 @@ static void sdhci_prepare_dma(struct sdhci_host *host, struct mmc_data *data,
 			sdhci_writel(host, upper_32_bits(host->adma_addr),
 				     SDHCI_ADMA_ADDRESS_HI);
 	}
+#endif
 }
 #else
 static void sdhci_prepare_dma(struct sdhci_host *host, struct mmc_data *data,
@@ -209,8 +164,9 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data)
 				start_addr &=
 				~(SDHCI_DEFAULT_BOUNDARY_SIZE - 1);
 				start_addr += SDHCI_DEFAULT_BOUNDARY_SIZE;
-				sdhci_writel(host, phys_to_bus((ulong)start_addr),
-					     SDHCI_DMA_ADDRESS);
+				start_addr = dev_phys_to_bus(mmc_to_dev(host->mmc),
+							     start_addr);
+				sdhci_writel(host, start_addr, SDHCI_DMA_ADDRESS);
 			}
 		}
 		if (timeout-- > 0)
@@ -221,8 +177,10 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data)
 		}
 	} while (!(stat & SDHCI_INT_DATA_END));
 
+#if (defined(CONFIG_MMC_SDHCI_SDMA) || CONFIG_IS_ENABLED(MMC_SDHCI_ADMA))
 	dma_unmap_single(host->start_addr, data->blocks * data->blocksize,
 			 mmc_get_dma_dir(data));
+#endif
 
 	return 0;
 }
@@ -556,6 +514,100 @@ void sdhci_set_uhs_timing(struct sdhci_host *host)
 	sdhci_writew(host, reg, SDHCI_HOST_CONTROL2);
 }
 
+static void sdhci_set_voltage(struct sdhci_host *host)
+{
+	if (IS_ENABLED(CONFIG_MMC_IO_VOLTAGE)) {
+		struct mmc *mmc = (struct mmc *)host->mmc;
+		u32 ctrl;
+
+		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+
+		switch (mmc->signal_voltage) {
+		case MMC_SIGNAL_VOLTAGE_330:
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
+			if (mmc->vqmmc_supply) {
+				if (regulator_set_enable_if_allowed(mmc->vqmmc_supply, false)) {
+					pr_err("failed to disable vqmmc-supply\n");
+					return;
+				}
+
+				if (regulator_set_value(mmc->vqmmc_supply, 3300000)) {
+					pr_err("failed to set vqmmc-voltage to 3.3V\n");
+					return;
+				}
+
+				if (regulator_set_enable_if_allowed(mmc->vqmmc_supply, true)) {
+					pr_err("failed to enable vqmmc-supply\n");
+					return;
+				}
+			}
+#endif
+			if (IS_SD(mmc)) {
+				ctrl &= ~SDHCI_CTRL_VDD_180;
+				sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+			}
+
+			/* Wait for 5ms */
+			mdelay(5);
+
+			/* 3.3V regulator output should be stable within 5 ms */
+			if (IS_SD(mmc)) {
+				if (ctrl & SDHCI_CTRL_VDD_180) {
+					pr_err("3.3V regulator output did not become stable\n");
+					return;
+				}
+			}
+
+			break;
+		case MMC_SIGNAL_VOLTAGE_180:
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
+			if (mmc->vqmmc_supply) {
+				if (regulator_set_enable_if_allowed(mmc->vqmmc_supply, false)) {
+					pr_err("failed to disable vqmmc-supply\n");
+					return;
+				}
+
+				if (regulator_set_value(mmc->vqmmc_supply, 1800000)) {
+					pr_err("failed to set vqmmc-voltage to 1.8V\n");
+					return;
+				}
+
+				if (regulator_set_enable_if_allowed(mmc->vqmmc_supply, true)) {
+					pr_err("failed to enable vqmmc-supply\n");
+					return;
+				}
+			}
+#endif
+			if (IS_SD(mmc)) {
+				ctrl |= SDHCI_CTRL_VDD_180;
+				sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+			}
+
+			/* Wait for 5 ms */
+			mdelay(5);
+
+			/* 1.8V regulator output has to be stable within 5 ms */
+			if (IS_SD(mmc)) {
+				if (!(ctrl & SDHCI_CTRL_VDD_180)) {
+					pr_err("1.8V regulator output did not become stable\n");
+					return;
+				}
+			}
+
+			break;
+		default:
+			/* No signal voltage switch required */
+			return;
+		}
+	}
+}
+
+void sdhci_set_control_reg(struct sdhci_host *host)
+{
+	sdhci_set_voltage(host);
+	sdhci_set_uhs_timing(host);
+}
+
 #ifdef CONFIG_DM_MMC
 static int sdhci_set_ios(struct udevice *dev)
 {
@@ -770,9 +822,9 @@ int sdhci_setup_cfg(struct mmc_config *cfg, struct sdhci_host *host,
 		       __func__);
 		return -EINVAL;
 	}
-	host->adma_desc_table = memalign(ARCH_DMA_MINALIGN, ADMA_TABLE_SZ);
-
+	host->adma_desc_table = sdhci_adma_init();
 	host->adma_addr = (dma_addr_t)host->adma_desc_table;
+
 #ifdef CONFIG_DMA_ADDR_T_64BIT
 	host->flags |= USE_ADMA64;
 #else
@@ -859,7 +911,8 @@ int sdhci_setup_cfg(struct mmc_config *cfg, struct sdhci_host *host,
 		cfg->host_caps &= ~MMC_MODE_HS_52MHz;
 	}
 
-	if (!(cfg->voltages & MMC_VDD_165_195))
+	if (!(cfg->voltages & MMC_VDD_165_195) ||
+	    (host->quirks & SDHCI_QUIRK_NO_1_8_V))
 		caps_1 &= ~(SDHCI_SUPPORT_SDR104 | SDHCI_SUPPORT_SDR50 |
 			    SDHCI_SUPPORT_DDR50);
 

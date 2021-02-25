@@ -9,6 +9,7 @@
 #include <image.h>
 #include <init.h>
 #include <net.h>
+#include <asm/global_data.h>
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/cache.h>
@@ -484,6 +485,7 @@ int checkboard(void)
 	return 0;
 }
 
+#ifndef CONFIG_DM_ETH
 int board_eth_init(struct bd_info *bis)
 {
 #ifdef CONFIG_TSEC_ENET
@@ -524,6 +526,7 @@ int board_eth_init(struct bd_info *bis)
 
 	return pci_eth_init(bis);
 }
+#endif
 
 #if defined(CONFIG_OF_BOARD_SETUP)
 void fdt_del_flexcan(void *blob)

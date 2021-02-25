@@ -13,6 +13,7 @@
 #include <log.h>
 #include <net.h>
 #include <phy.h>
+#include <asm/global_data.h>
 #include <linux/bug.h>
 #include <linux/errno.h>
 #include <net/pcap.h>
@@ -261,7 +262,7 @@ int eth_initialize(void)
 	}
 
 	if (!eth_devices) {
-		puts("No ethernet found.\n");
+		log_err("No ethernet found.\n");
 		bootstage_error(BOOTSTAGE_ID_NET_ETH_START);
 	} else {
 		struct eth_device *dev = eth_devices;
@@ -319,7 +320,7 @@ int eth_init(void)
 	struct eth_device *old_current;
 
 	if (!eth_current) {
-		puts("No ethernet found.\n");
+		log_err("No ethernet found.\n");
 		return -ENODEV;
 	}
 
@@ -365,7 +366,7 @@ int eth_send(void *packet, int length)
 	ret = eth_current->send(eth_current, packet, length);
 #if defined(CONFIG_CMD_PCAP)
 	if (ret >= 0)
-		pcap_post(packet, lengeth, true);
+		pcap_post(packet, length, true);
 #endif
 	return ret;
 }

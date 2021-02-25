@@ -69,17 +69,9 @@
 
 /* Ethernet need */
 #ifdef CONFIG_DWC_ETH_QOS
-#define CONFIG_SYS_NONCACHED_MEMORY	(1 * SZ_1M)	/* 1M */
 #define CONFIG_SERVERIP                 192.168.1.1
 #define CONFIG_BOOTP_SERVERIP
 #define CONFIG_SYS_AUTOLOAD		"no"
-#endif
-
-#ifdef CONFIG_DM_VIDEO
-#define CONFIG_VIDEO_BMP_RLE8
-#define CONFIG_BMP_16BPP
-#define CONFIG_BMP_24BPP
-#define CONFIG_BMP_32BPP
 #endif
 
 /*****************************************************************************/
@@ -140,6 +132,19 @@
 		"run distro_bootcmd;" \
 	"fi;\0"
 
+#ifdef CONFIG_FASTBOOT_CMD_OEM_FORMAT
+/* eMMC default partitions for fastboot command: oem format */
+#define PARTS_DEFAULT \
+	"partitions=" \
+	"name=ssbl,size=2M;" \
+	"name=bootfs,size=64MB,bootable;" \
+	"name=vendorfs,size=16M;" \
+	"name=rootfs,size=746M;" \
+	"name=userfs,size=-\0"
+#else
+#define PARTS_DEFAULT
+#endif
+
 #include <config_distro_bootcmd.h>
 
 /*
@@ -158,6 +163,7 @@
 	"altbootcmd=run bootcmd\0" \
 	"env_check=if env info -p -d -q; then env save; fi\0" \
 	STM32MP_BOOTCMD \
+	PARTS_DEFAULT \
 	BOOTENV \
 	"boot_net_usb_start=true\0"
 

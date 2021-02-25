@@ -617,7 +617,7 @@ int soc_clk_dump(void)
 	int i, ret;
 
 	ret = uclass_get_device_by_driver(UCLASS_CLK,
-		DM_GET_DRIVER(zynqmp_clk), &dev);
+		DM_DRIVER_GET(zynqmp_clk), &dev);
 	if (ret)
 		return ret;
 
@@ -710,10 +710,10 @@ static const struct udevice_id zynqmp_clk_ids[] = {
 };
 
 U_BOOT_DRIVER(zynqmp_clk) = {
-	.name = "zynqmp-clk",
+	.name = "zynqmp_clk",
 	.id = UCLASS_CLK,
 	.of_match = zynqmp_clk_ids,
 	.probe = zynqmp_clk_probe,
 	.ops = &zynqmp_clk_ops,
-	.priv_auto_alloc_size = sizeof(struct zynqmp_clk_priv),
+	.priv_auto	= sizeof(struct zynqmp_clk_priv),
 };

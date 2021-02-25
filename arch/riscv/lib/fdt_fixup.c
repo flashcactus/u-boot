@@ -10,6 +10,7 @@
 #include <fdt_support.h>
 #include <log.h>
 #include <mapmem.h>
+#include <asm/global_data.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -75,7 +76,7 @@ int riscv_fdt_copy_resv_mem_node(const void *src, void *dst)
 		pmp_mem.start = addr;
 		pmp_mem.end = addr + size - 1;
 		err = fdtdec_add_reserved_memory(dst, basename, &pmp_mem,
-						 &phandle);
+						 &phandle, false);
 		if (err < 0 && err != -FDT_ERR_EXISTS) {
 			log_err("failed to add reserved memory: %d\n", err);
 			return err;

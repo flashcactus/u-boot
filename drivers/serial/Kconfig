@@ -134,6 +134,22 @@ config SERIAL_SEARCH_ALL
 
 	  If unsure, say N.
 
+config SERIAL_PROBE_ALL
+	bool "Probe all available serial devices"
+	depends on DM_SERIAL
+	default n
+	help
+	  The serial subsystem only probes for a single serial device,
+	  but does not probe for other remaining serial devices.
+	  With this option set, we make probing and searching for
+	  all available devices optional.
+	  Normally, U-Boot talks to one serial port at a time, but SBSA
+	  compliant UART devices like PL011 require initialization
+	  by firmware and to let the kernel use serial port for sending
+	  and receiving the characters.
+
+	  If unsure, say N.
+
 config SPL_DM_SERIAL
 	bool "Enable Driver Model for serial drivers in SPL"
 	depends on DM_SERIAL && SPL_DM
@@ -401,6 +417,16 @@ config DEBUG_UART_MTK
 	  driver will be available until the real driver model serial is
 	  running.
 
+config DEBUG_UART_MT7620
+	bool "UART driver for MediaTek MT7620 and earlier SoCs"
+	depends on MT7620_SERIAL
+	help
+	  Select this to enable a debug UART using the UART driver for
+	  MediaTek MT7620 and earlier SoCs.
+	  You will need to provide parameters to make this work. The
+	  driver will be available until the real driver model serial is
+	  running.
+
 endchoice
 
 config DEBUG_UART_BASE
@@ -609,7 +635,7 @@ config MCFUART
 
 config MXC_UART
 	bool "IMX serial port support"
-	depends on ARCH_MX25 || ARCH_MX31 || TARGET_APF27 || TARGET_FLEA3 || TARGET_MX35PDK \
+	depends on ARCH_MX25 || ARCH_MX31 || TARGET_APF27 || TARGET_FLEA3 \
 		|| MX5 || MX6 || MX7 || IMX8M
 	help
 	  If you have a machine based on a Motorola IMX CPU you
@@ -734,7 +760,7 @@ config UNIPHIER_SERIAL
 
 config XILINX_UARTLITE
 	bool "Xilinx Uarlite support"
-	depends on DM_SERIAL && (MICROBLAZE || ARCH_ZYNQ || ARCH_ZYNQMP || 4xx)
+	depends on DM_SERIAL
 	help
 	  If you have a Xilinx based board and want to use the uartlite
 	  serial ports, say Y to this option. If unsure, say N.
@@ -802,7 +828,7 @@ config STM32_SERIAL
 
 config ZYNQ_SERIAL
 	bool "Cadence (Xilinx Zynq) UART support"
-	depends on DM_SERIAL && (MICROBLAZE || ARCH_ZYNQ || ARCH_ZYNQMP || ARCH_ZYNQMP_R5)
+	depends on DM_SERIAL
 	help
 	  This driver supports the Cadence UART. It is found e.g. in Xilinx
 	  Zynq/ZynqMP.
@@ -816,6 +842,16 @@ config MTK_SERIAL
 	  tree binding to operate.
 	  The High-speed UART is compatible with the ns16550a UART and have
 	  its own high-speed registers.
+
+config MT7620_SERIAL
+	bool "UART driver for MediaTek MT7620 and earlier SoCs"
+	depends on DM_SERIAL
+	help
+	  Select this to enable UART support for MediaTek MT7620 and earlier
+	  SoCs. This driver uses driver model and requires a device tree
+	  binding to operate.
+	  The UART driver for MediaTek MT7620 and earlier SoCs is *NOT*
+	  compatible with the ns16550a UART.
 
 config MPC8XX_CONS
 	bool "Console driver for MPC8XX"

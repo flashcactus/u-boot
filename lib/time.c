@@ -9,10 +9,12 @@
 #include <dm.h>
 #include <errno.h>
 #include <init.h>
+#include <spl.h>
 #include <time.h>
 #include <timer.h>
 #include <watchdog.h>
 #include <div64.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 
@@ -91,13 +93,18 @@ uint64_t notrace get_ticks(void)
 
 		ret = dm_timer_init();
 		if (ret)
-			return ret;
+			panic("Could not initialize timer (err %d)\n", ret);
 #endif
 	}
 
 	ret = timer_get_count(gd->timer, &count);
-	if (ret)
-		return ret;
+	if (ret) {
+		if (spl_phase() > PHASE_TPL)
+			panic("Could not read count from timer (err %d)\n",
+			      ret);
+		else
+			panic("no timer (err %d)\n", ret);
+	}
 
 	return count;
 }

@@ -17,6 +17,7 @@
 #include <miiphy.h>
 #include <phy.h>
 #include <errno.h>
+#include <asm/global_data.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -500,6 +501,9 @@ int phy_init(void)
 #ifdef CONFIG_PHY_CORTINA
 	phy_cortina_init();
 #endif
+#ifdef CONFIG_PHY_CORTINA_ACCESS
+	phy_cortina_access_init();
+#endif
 #ifdef CONFIG_PHY_DAVICOM
 	phy_davicom_init();
 #endif
@@ -664,7 +668,7 @@ static struct phy_device *phy_device_create(struct mii_dev *bus, int addr,
 	dev = malloc(sizeof(*dev));
 	if (!dev) {
 		printf("Failed to allocate PHY device for %s:%d\n",
-		       bus->name, addr);
+		       bus ? bus->name : "(null bus)", addr);
 		return NULL;
 	}
 
@@ -692,7 +696,7 @@ static struct phy_device *phy_device_create(struct mii_dev *bus, int addr,
 		return NULL;
 	}
 
-	if (addr >= 0 && addr < PHY_MAX_ADDR)
+	if (addr >= 0 && addr < PHY_MAX_ADDR && phy_id != PHY_FIXED_ID)
 		bus->phymap[addr] = dev;
 
 	return dev;
@@ -973,6 +977,37 @@ static struct phy_device *phy_connect_gmii2rgmii(struct mii_dev *bus,
 #endif
 
 #ifdef CONFIG_PHY_FIXED
+/**
+ * fixed_phy_create() - create an unconnected fixed-link pseudo-PHY device
+ * @node: OF node for the container of the fixed-link node
+ *
+ * Description: Creates a struct phy_device based on a fixed-link of_node
+ * description. Can be used without phy_connect by drivers which do not expose
+ * a UCLASS_ETH udevice.
+ */
+struct phy_device *fixed_phy_create(ofnode node)
+{
+	phy_interface_t interface = PHY_INTERFACE_MODE_NONE;
+	const char *if_str;
+	ofnode subnode;
+
+	if_str = ofnode_read_string(node, "phy-mode");
+	if (!if_str) {
+		if_str = ofnode_read_string(node, "phy-interface-type");
+	}
+	if (if_str) {
+		interface = phy_get_interface_by_name(if_str);
+	}
+
+	subnode = ofnode_find_subnode(node, "fixed-link");
+	if (!ofnode_valid(subnode)) {
+		return NULL;
+	}
+
+	return phy_device_create(NULL, ofnode_to_offset(subnode), PHY_FIXED_ID,
+				 false, interface);
+}
+
 #ifdef CONFIG_DM_ETH
 static struct phy_device *phy_connect_fixed(struct mii_dev *bus,
 					    struct udevice *dev,

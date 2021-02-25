@@ -224,6 +224,19 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 	}								\
 }
 
+/* Assert that two addresses (converted from pointers) are equal */
+#define ut_asserteq_addr(expr1, expr2) {				\
+	ulong _val1 = map_to_sysmem(expr1);				\
+	ulong _val2 = map_to_sysmem(expr2);				\
+									\
+	if (_val1 != _val2) {						\
+		ut_failf(uts, __FILE__, __LINE__, __func__,		\
+			 #expr1 " = " #expr2,				\
+			 "Expected %lx, got %lx", _val1, _val2);	\
+		return CMD_RET_FAILURE;					\
+	}								\
+}
+
 /* Assert that a pointer is NULL */
 #define ut_assertnull(expr) {					\
 	const void *_val = (expr);					\
@@ -324,5 +337,23 @@ ulong ut_check_free(void);
  *	allocated, negative means less has been allocated (i.e. some is freed)
  */
 long ut_check_delta(ulong last);
+
+/**
+ * ut_silence_console() - Silence the console if requested by the user
+ *
+ * This stops test output from appear on the console. It is the default on
+ * sandbox, unless the -v flag is given. For other boards, this does nothing.
+ *
+ * @uts: Test state (in case in future we want to keep state here)
+ */
+void ut_silence_console(struct unit_test_state *uts);
+
+/**
+ * ut_unsilence_console() - Unsilence the console after a test
+ *
+ * This restarts console output again and turns off console recording. This
+ * happens on all boards, including sandbox.
+ */
+void ut_unsilence_console(struct unit_test_state *uts);
 
 #endif

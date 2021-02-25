@@ -6,6 +6,7 @@
 #include <cli.h>
 #include <command.h>
 #include <console.h>
+#include <asm/global_data.h>
 #include <asm/ptrace.h>
 #include <linux/ctype.h>
 #include <net.h>
@@ -348,7 +349,7 @@ int do_bedbug_stack(struct cmd_tbl *cmdtp, int flag, int argc,
 		return 1;
 	}
 
-	top = gd->bd->bi_memstart + gd->bd->bi_memsize;
+	top = gd->ram_start + gd->ram_size;
 	depth = 0;
 
 	printf ("Depth     PC\n");

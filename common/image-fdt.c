@@ -17,6 +17,7 @@
 #include <lmb.h>
 #include <log.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 #include <linux/libfdt.h>
 #include <mapmem.h>
 #include <asm/io.h>
@@ -399,13 +400,16 @@ int boot_get_fdt(int flag, int argc, char *const argv[], uint8_t arch,
 			 */
 #if CONFIG_IS_ENABLED(FIT)
 			/* check FDT blob vs FIT blob */
-			if (fit_check_format(buf)) {
+			if (!fit_check_format(buf, IMAGE_SIZE_INVAL)) {
 				ulong load, len;
 
 				fdt_noffset = boot_get_fdt_fit(images,
 					fdt_addr, &fit_uname_fdt,
 					&fit_uname_config,
 					arch, &load, &len);
+
+				if (fdt_noffset < 0)
+					goto error;
 
 				images->fit_hdr_fdt = map_sysmem(fdt_addr, 0);
 				images->fit_uname_fdt = fit_uname_fdt;
@@ -567,6 +571,10 @@ int image_setup_libfdt(bootm_headers_t *images, void *blob,
 
 	/* Update ethernet nodes */
 	fdt_fixup_ethernet(blob);
+#if CONFIG_IS_ENABLED(CMD_PSTORE)
+	/* Append PStore configuration */
+	fdt_fixup_pstore(blob);
+#endif
 	if (IMAGE_OF_BOARD_SETUP) {
 		fdt_ret = ft_board_setup(blob, gd->bd);
 		if (fdt_ret) {

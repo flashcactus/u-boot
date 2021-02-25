@@ -56,6 +56,12 @@
 #define CONFIG_SKIP_LOWLEVEL_INIT
 #endif
 
+/*
+ * If the maximum size is not declared then it is defined as
+ * CONFIG_SYS_DFU_DATA_BUF_SIZE.
+ */
+#define CONFIG_SYS_DFU_MAX_FILE_SIZE	(1024 * 1024 * 8)   /* 8 MiB */
+
 #define CONFIG_SPL_MAX_SIZE		CONFIG_SYS_K3_MAX_DOWNLODABLE_IMAGE_SIZE
 
 #define CONFIG_SYS_BOOTM_LEN		SZ_64M
@@ -69,9 +75,6 @@
 	"findfdt="							\
 		"setenv name_fdt k3-am654-base-board.dtb;"		\
 		"setenv fdtfile ${name_fdt}\0"				\
-	"loadaddr=0x80080000\0"						\
-	"fdtaddr=0x82000000\0"						\
-	"overlayaddr=0x83000000\0"					\
 	"name_kern=Image\0"						\
 	"console=ttyS2,115200n8\0"					\
 	"stdin=serial,usbkbd\0"						\
@@ -93,8 +96,8 @@
 		"fdt resize 0x100000;"					\
 		"for overlay in $name_overlays;"			\
 		"do;"							\
-		"load mmc ${bootpart} ${overlayaddr} ${bootdir}/${overlay};"	\
-		"fdt apply ${overlayaddr};"				\
+		"load mmc ${bootpart} ${dtboaddr} ${bootdir}/${overlay};"	\
+		"fdt apply ${dtboaddr};"				\
 		"done;\0"						\
 	"get_kern_mmc=load mmc ${bootpart} ${loadaddr} "		\
 		"${bootdir}/${name_kern}\0"				\
@@ -133,6 +136,7 @@
 
 /* Incorporate settings into the U-Boot environment */
 #define CONFIG_EXTRA_ENV_SETTINGS					\
+	DEFAULT_LINUX_BOOT_ENV						\
 	DEFAULT_MMC_TI_ARGS						\
 	DEFAULT_FIT_TI_ARGS						\
 	EXTRA_ENV_AM65X_BOARD_SETTINGS					\

@@ -12,6 +12,7 @@
 #include <command.h>
 #include <hang.h>
 #include <log.h>
+#include <asm/global_data.h>
 #include <dm/device.h>
 #include <dm/root.h>
 #include <errno.h>
@@ -136,7 +137,7 @@ static int boot_prep_linux(bootm_headers_t *images)
 	printf("Setup at %#08lx\n", images->ep);
 	ret = setup_zimage((void *)images->ep, cmd_line_dest,
 			0, images->rd_start,
-			images->rd_end - images->rd_start);
+			images->rd_end - images->rd_start, 0);
 
 	if (ret) {
 		printf("## Setting up boot parameters failed ...\n");

@@ -11,7 +11,7 @@ config DM_I2C
 	  Enable driver model for I2C. The I2C uclass interface: probe, read,
 	  write and speed, is implemented with the bus drivers operations,
 	  which provide methods for bus setting and data transfer. Each chip
-	  device (bus child) info is kept as parent platdata. The interface
+	  device (bus child) info is kept as parent plat. The interface
 	  is defined in include/i2c.h.
 
 config I2C_CROS_EC_TUNNEL
@@ -222,7 +222,7 @@ endif
 if SYS_I2C_MXC_I2C1
 config SYS_MXC_I2C1_SPEED
 	int "I2C Channel 1 speed"
-	default 40000000 if TARGET_LS2080A_SIMU || TARGET_LS2080A_EMU
+	default 40000000 if TARGET_LS2080A_EMU
 	default 100000
 	help
 	 MXC I2C Channel 1 speed
@@ -237,7 +237,7 @@ endif
 if SYS_I2C_MXC_I2C2
 config SYS_MXC_I2C2_SPEED
 	int "I2C Channel 2 speed"
-	default 40000000 if TARGET_LS2080A_SIMU || TARGET_LS2080A_EMU
+	default 40000000 if TARGET_LS2080A_EMU
 	default 100000
 	help
 	 MXC I2C Channel 2 speed
@@ -341,6 +341,13 @@ config SYS_I2C_NEXELL
 	  Nexell parts such as S5Pxx18 series SoCs. All chips
 	  have several I2C ports and all are provided, controlled by the
 	  device tree.
+
+config SYS_I2C_OCORES
+	bool "ocores I2C driver"
+	depends on DM_I2C
+	help
+	  Add support for ocores I2C controller. For details see
+	  https://opencores.org/projects/i2c
 
 config SYS_I2C_OMAP24XX
 	bool "TI OMAP2+ I2C driver"

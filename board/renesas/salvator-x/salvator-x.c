@@ -14,6 +14,7 @@
 #include <malloc.h>
 #include <netdev.h>
 #include <dm.h>
+#include <asm/global_data.h>
 #include <dm/platform_data/serial_sh.h>
 #include <asm/processor.h>
 #include <asm/mach-types.h>
@@ -30,10 +31,6 @@
 #include <mmc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-void s_init(void)
-{
-}
 
 #define DVFS_MSTP926		BIT(26)
 #define HSUSB_MSTP704		BIT(4)	/* HSUSB */

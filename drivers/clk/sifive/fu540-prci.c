@@ -29,23 +29,23 @@
  */
 
 #include <common.h>
-#include <asm/io.h>
-#include <asm/arch/reset.h>
 #include <clk-uclass.h>
 #include <clk.h>
 #include <div64.h>
 #include <dm.h>
-#include <errno.h>
-#include <reset-uclass.h>
 #include <dm/device.h>
+#include <dm/device_compat.h>
 #include <dm/uclass.h>
-#include <linux/delay.h>
-#include <linux/err.h>
-
-#include <linux/math64.h>
-#include <linux/clk/analogbits-wrpll-cln28hpc.h>
 #include <dt-bindings/clock/sifive-fu540-prci.h>
 #include <dt-bindings/reset/sifive-fu540-prci.h>
+#include <errno.h>
+#include <reset-uclass.h>
+#include <asm/io.h>
+#include <asm/arch/reset.h>
+#include <linux/delay.h>
+#include <linux/err.h>
+#include <linux/math64.h>
+#include <linux/clk/analogbits-wrpll-cln28hpc.h>
 
 /*
  * EXPECTED_CLK_PARENT_COUNT: how many parent clocks this driver expects:
@@ -537,7 +537,7 @@ static int __prci_consumer_reset(const char *rst_name, bool trigger)
 	int ret;
 
 	ret = uclass_get_device_by_driver(UCLASS_RESET,
-					  DM_GET_DRIVER(sifive_reset),
+					  DM_DRIVER_GET(sifive_reset),
 					  &dev);
 	if (ret) {
 		dev_err(dev, "Reset driver not found: %d\n", ret);
@@ -807,6 +807,6 @@ U_BOOT_DRIVER(sifive_fu540_prci) = {
 	.of_match = sifive_fu540_prci_ids,
 	.probe = sifive_fu540_prci_probe,
 	.ops = &sifive_fu540_prci_ops,
-	.priv_auto_alloc_size = sizeof(struct __prci_data),
+	.priv_auto	= sizeof(struct __prci_data),
 	.bind = sifive_fu540_clk_bind,
 };

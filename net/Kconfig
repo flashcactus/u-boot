@@ -8,6 +8,12 @@ menuconfig NET
 
 if NET
 
+config PROT_UDP
+	bool "Enable generic udp framework"
+	help
+	  Enable a generic udp framework that allows defining a custom
+	  handler for udp protocol.
+
 config BOOTP_SEND_HOSTNAME
 	bool "Send hostname to DNS server"
 	help
@@ -67,5 +73,19 @@ config TFTP_WINDOWSIZE
 	  RFC7440 defines an optional window size of transmits,
 	  before an ack response is required.
 	  The default TFTP implementation implies a window size of 1.
+
+config SERVERIP_FROM_PROXYDHCP
+	bool "Get serverip value from Proxy DHCP response"
+	help
+	  Allows bootfile config to be fetched from Proxy DHCP server
+		while IP is obtained from main DHCP server.
+
+config SERVERIP_FROM_PROXYDHCP_DELAY_MS
+	int "# of additional milliseconds to wait for ProxyDHCP response"
+	default 100
+	help
+	  Amount of additional time to wait for ProxyDHCP response after
+		receiving response from main DHCP server. Has no effect if
+		SERVERIP_FROM_PROXYDHCP is false.
 
 endif   # if NET

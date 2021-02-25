@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <ext4fs.h>
 #include <mmc.h>
+#include <asm/global_data.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -41,7 +42,21 @@ __weak const char *env_ext4_get_intf(void)
 
 __weak const char *env_ext4_get_dev_part(void)
 {
+#ifdef CONFIG_MMC
+	static char *part_str;
+
+	if (!part_str) {
+		part_str = CONFIG_ENV_EXT4_DEVICE_AND_PART;
+		if (!strcmp(CONFIG_ENV_EXT4_INTERFACE, "mmc") && part_str[0] == ':') {
+			part_str = "0" CONFIG_ENV_EXT4_DEVICE_AND_PART;
+			part_str[0] += mmc_get_env_dev();
+		}
+	}
+
+	return part_str;
+#else
 	return (const char *)CONFIG_ENV_EXT4_DEVICE_AND_PART;
+#endif
 }
 
 static int env_ext4_save_buffer(env_t *env_new)

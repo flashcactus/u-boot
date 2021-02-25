@@ -21,6 +21,7 @@
 #include <mapmem.h>
 #include <linux/libfdt.h>
 #include <serial.h>
+#include <asm/global_data.h>
 #include <asm/sections.h>
 #include <linux/ctype.h>
 #include <linux/lzo.h>
@@ -500,6 +501,17 @@ int fdtdec_get_alias_seq(const void *blob, const char *base, int offset,
 		slash = strrchr(prop, '/');
 		if (strcmp(slash + 1, find_name))
 			continue;
+
+		/*
+		 * Adding an extra check to distinguish DT nodes with
+		 * same name
+		 */
+		if (IS_ENABLED(CONFIG_PHANDLE_CHECK_SEQ)) {
+			if (fdt_get_phandle(blob, offset) !=
+			    fdt_get_phandle(blob, fdt_path_offset(blob, prop)))
+				continue;
+		}
+
 		val = trailing_strtol(name);
 		if (val != -1) {
 			*seqp = val;
@@ -589,7 +601,8 @@ int fdtdec_prepare_fdt(void)
 #ifdef CONFIG_SPL_BUILD
 		puts("Missing DTB\n");
 #else
-		puts("No valid device tree binary found - please append one to U-Boot binary, use u-boot-dtb.bin or define CONFIG_OF_EMBED. For sandbox, use -d <file.dtb>\n");
+		printf("No valid device tree binary found at %p\n",
+		       gd->fdt_blob);
 # ifdef DEBUG
 		if (gd->fdt_blob) {
 			printf("fdt_blob=%p\n", gd->fdt_blob);
@@ -746,7 +759,7 @@ int fdtdec_parse_phandle_with_args(const void *blob, int src_node,
 			if (cells_name || cur_index == index) {
 				node = fdt_node_offset_by_phandle(blob,
 								  phandle);
-				if (!node) {
+				if (node < 0) {
 					debug("%s: could not find phandle\n",
 					      fdt_get_name(blob, src_node,
 							   NULL));
@@ -1073,8 +1086,6 @@ int fdtdec_setup_mem_size_base(void)
 	return 0;
 }
 
-#if defined(CONFIG_NR_DRAM_BANKS)
-
 ofnode get_next_memory_node(ofnode mem)
 {
 	do {
@@ -1170,7 +1181,6 @@ int fdtdec_setup_mem_size_base_lowest(void)
 
 	return 0;
 }
-#endif
 
 #if CONFIG_IS_ENABLED(MULTI_DTB_FIT)
 # if CONFIG_IS_ENABLED(MULTI_DTB_FIT_GZIP) ||\
@@ -1319,7 +1329,7 @@ static int fdtdec_init_reserved_memory(void *blob)
 
 int fdtdec_add_reserved_memory(void *blob, const char *basename,
 			       const struct fdt_memory *carveout,
-			       uint32_t *phandlep)
+			       uint32_t *phandlep, bool no_map)
 {
 	fdt32_t cells[4] = {}, *ptr = cells;
 	uint32_t upper, lower, phandle;
@@ -1419,6 +1429,12 @@ int fdtdec_add_reserved_memory(void *blob, const char *basename,
 	if (err < 0)
 		return err;
 
+	if (no_map) {
+		err = fdt_setprop(blob, node, "no-map", NULL, 0);
+		if (err < 0)
+			return err;
+	}
+
 	/* return the phandle for the new node for the caller to use */
 	if (phandlep)
 		*phandlep = phandle;
@@ -1484,7 +1500,7 @@ int fdtdec_set_carveout(void *blob, const char *node, const char *prop_name,
 	fdt32_t value;
 	void *prop;
 
-	err = fdtdec_add_reserved_memory(blob, name, carveout, &phandle);
+	err = fdtdec_add_reserved_memory(blob, name, carveout, &phandle, false);
 	if (err < 0) {
 		debug("failed to add reserved memory: %d\n", err);
 		return err;
@@ -1557,7 +1573,7 @@ int fdtdec_setup(void)
 		return -1;
 	}
 # elif defined(CONFIG_OF_PRIOR_STAGE)
-	gd->fdt_blob = (void *)prior_stage_fdt_address;
+	gd->fdt_blob = (void *)(uintptr_t)prior_stage_fdt_address;
 # endif
 # ifndef CONFIG_SPL_BUILD
 	/* Allow the early environment to override the fdt address */
@@ -1633,7 +1649,6 @@ int fdtdec_resetup(int *rescan)
 }
 #endif
 
-#ifdef CONFIG_NR_DRAM_BANKS
 int fdtdec_decode_ram_size(const void *blob, const char *area, int board_id,
 			   phys_addr_t *basep, phys_size_t *sizep,
 			   struct bd_info *bd)
@@ -1739,6 +1754,5 @@ int fdtdec_decode_ram_size(const void *blob, const char *area, int board_id,
 
 	return 0;
 }
-#endif /* CONFIG_NR_DRAM_BANKS */
 
 #endif /* !USE_HOSTCC */

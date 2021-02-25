@@ -10,6 +10,7 @@
 #include <log.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <clk.h>
 #include <dm.h>
@@ -156,7 +157,7 @@ struct zynqmp_qspi_dma_regs {
 
 DECLARE_GLOBAL_DATA_PTR;
 
-struct zynqmp_qspi_platdata {
+struct zynqmp_qspi_plat {
 	struct zynqmp_qspi_regs *regs;
 	struct zynqmp_qspi_dma_regs *dma_regs;
 	u32 frequency;
@@ -175,9 +176,9 @@ struct zynqmp_qspi_priv {
 	unsigned int cs_change:1;
 };
 
-static int zynqmp_qspi_ofdata_to_platdata(struct udevice *bus)
+static int zynqmp_qspi_of_to_plat(struct udevice *bus)
 {
-	struct zynqmp_qspi_platdata *plat = bus->platdata;
+	struct zynqmp_qspi_plat *plat = dev_get_plat(bus);
 
 	debug("%s\n", __func__);
 
@@ -255,7 +256,7 @@ static void zynqmp_qspi_chipselect(struct zynqmp_qspi_priv *priv, int is_on)
 
 void zynqmp_qspi_set_tapdelay(struct udevice *bus, u32 baudrateval)
 {
-	struct zynqmp_qspi_platdata *plat = bus->platdata;
+	struct zynqmp_qspi_plat *plat = dev_get_plat(bus);
 	struct zynqmp_qspi_priv *priv = dev_get_priv(bus);
 	struct zynqmp_qspi_regs *regs = priv->regs;
 	u32 tapdlybypass = 0, lpbkdlyadj = 0, datadlyadj = 0, clk_rate;
@@ -295,7 +296,7 @@ void zynqmp_qspi_set_tapdelay(struct udevice *bus, u32 baudrateval)
 
 static int zynqmp_qspi_set_speed(struct udevice *bus, uint speed)
 {
-	struct zynqmp_qspi_platdata *plat = bus->platdata;
+	struct zynqmp_qspi_plat *plat = dev_get_plat(bus);
 	struct zynqmp_qspi_priv *priv = dev_get_priv(bus);
 	struct zynqmp_qspi_regs *regs = priv->regs;
 	u32 confr;
@@ -333,7 +334,7 @@ static int zynqmp_qspi_set_speed(struct udevice *bus, uint speed)
 
 static int zynqmp_qspi_probe(struct udevice *bus)
 {
-	struct zynqmp_qspi_platdata *plat = dev_get_platdata(bus);
+	struct zynqmp_qspi_plat *plat = dev_get_plat(bus);
 	struct zynqmp_qspi_priv *priv = dev_get_priv(bus);
 	struct clk clk;
 	unsigned long clock;
@@ -346,20 +347,20 @@ static int zynqmp_qspi_probe(struct udevice *bus)
 
 	ret = clk_get_by_index(bus, 0, &clk);
 	if (ret < 0) {
-		dev_err(dev, "failed to get clock\n");
+		dev_err(bus, "failed to get clock\n");
 		return ret;
 	}
 
 	clock = clk_get_rate(&clk);
 	if (IS_ERR_VALUE(clock)) {
-		dev_err(dev, "failed to get rate\n");
+		dev_err(bus, "failed to get rate\n");
 		return clock;
 	}
 	debug("%s: CLK %ld\n", __func__, clock);
 
 	ret = clk_enable(&clk);
 	if (ret && ret != -ENOSYS) {
-		dev_err(dev, "failed to enable clock\n");
+		dev_err(bus, "failed to enable clock\n");
 		return ret;
 	}
 	plat->frequency = clock;
@@ -429,10 +430,8 @@ static int zynqmp_qspi_fill_tx_fifo(struct zynqmp_qspi_priv *priv, u32 size)
 				data |= GENMASK(31, 16);
 				break;
 			case 3:
-				data = *((u16 *)buf);
-				buf += 2;
-				data |= (*((u8 *)buf) << 16);
-				buf += 1;
+				data = *buf;
+				buf += 3;
 				data |= GENMASK(31, 24);
 				break;
 			}
@@ -727,8 +726,8 @@ U_BOOT_DRIVER(zynqmp_qspi) = {
 	.id     = UCLASS_SPI,
 	.of_match = zynqmp_qspi_ids,
 	.ops    = &zynqmp_qspi_ops,
-	.ofdata_to_platdata = zynqmp_qspi_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct zynqmp_qspi_platdata),
-	.priv_auto_alloc_size = sizeof(struct zynqmp_qspi_priv),
+	.of_to_plat = zynqmp_qspi_of_to_plat,
+	.plat_auto	= sizeof(struct zynqmp_qspi_plat),
+	.priv_auto	= sizeof(struct zynqmp_qspi_priv),
 	.probe  = zynqmp_qspi_probe,
 };

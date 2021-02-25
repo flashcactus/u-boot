@@ -16,6 +16,7 @@
 #include <dm/ofnode.h>
 #include <linux/err.h>
 #include <linux/ioport.h>
+#include <asm/global_data.h>
 
 int ofnode_read_u32(ofnode node, const char *propname, u32 *outp)
 {
@@ -226,6 +227,17 @@ int ofnode_read_u32_array(ofnode node, const char *propname,
 	}
 }
 
+#if !CONFIG_IS_ENABLED(DM_INLINE_OFNODE)
+bool ofnode_is_enabled(ofnode node)
+{
+	if (ofnode_is_np(node)) {
+		return of_device_is_available(ofnode_to_np(node));
+	} else {
+		return fdtdec_get_is_enabled(gd->fdt_blob,
+					     ofnode_to_offset(node));
+	}
+}
+
 ofnode ofnode_first_subnode(ofnode node)
 {
 	assert(ofnode_valid(node));
@@ -245,6 +257,7 @@ ofnode ofnode_next_subnode(ofnode node)
 	return offset_to_ofnode(
 		fdt_next_subnode(gd->fdt_blob, ofnode_to_offset(node)));
 }
+#endif /* !DM_INLINE_OFNODE */
 
 ofnode ofnode_get_parent(ofnode node)
 {
@@ -304,7 +317,8 @@ fdt_addr_t ofnode_get_addr_size_index(ofnode node, int index, fdt_size_t *size)
 
 		ns = of_n_size_cells(ofnode_to_np(node));
 
-		if (IS_ENABLED(CONFIG_OF_TRANSLATE) && ns > 0) {
+		if (IS_ENABLED(CONFIG_OF_TRANSLATE) &&
+		    (ns > 0 || gd_size_cells_0())) {
 			return of_translate_address(ofnode_to_np(node), prop_val);
 		} else {
 			na = of_n_addr_cells(ofnode_to_np(node));
@@ -409,7 +423,8 @@ int ofnode_parse_phandle_with_args(ofnode node, const char *list_name,
 		int ret;
 
 		ret = of_parse_phandle_with_args(ofnode_to_np(node),
-						 list_name, cells_name, index,
+						 list_name, cells_name,
+						 cell_count, index,
 						 &args);
 		if (ret)
 			return ret;
@@ -431,15 +446,15 @@ int ofnode_parse_phandle_with_args(ofnode node, const char *list_name,
 }
 
 int ofnode_count_phandle_with_args(ofnode node, const char *list_name,
-				   const char *cells_name)
+				   const char *cells_name, int cell_count)
 {
 	if (ofnode_is_np(node))
 		return of_count_phandle_with_args(ofnode_to_np(node),
-				list_name, cells_name);
+				list_name, cells_name, cell_count);
 	else
 		return fdtdec_parse_phandle_with_args(gd->fdt_blob,
 				ofnode_to_offset(node), list_name, cells_name,
-				0, -1, NULL);
+				cell_count, -1, NULL);
 }
 
 ofnode ofnode_path(const char *path)
@@ -471,6 +486,28 @@ ofnode ofnode_get_chosen_node(const char *name)
 	prop = ofnode_read_chosen_prop(name, NULL);
 	if (!prop)
 		return ofnode_null();
+
+	return ofnode_path(prop);
+}
+
+const void *ofnode_read_aliases_prop(const char *propname, int *sizep)
+{
+	ofnode node;
+
+	node = ofnode_path("/aliases");
+
+	return ofnode_read_prop(node, propname, sizep);
+}
+
+ofnode ofnode_get_aliases_node(const char *name)
+{
+	const char *prop;
+
+	prop = ofnode_read_aliases_prop(name, NULL);
+	if (!prop)
+		return ofnode_null();
+
+	debug("%s: node_path: %s\n", __func__, prop);
 
 	return ofnode_path(prop);
 }
@@ -655,8 +692,10 @@ fdt_addr_t ofnode_get_addr_size(ofnode node, const char *property,
 		ns = of_n_size_cells(np);
 		*sizep = of_read_number(prop + na, ns);
 
-		if (CONFIG_IS_ENABLED(OF_TRANSLATE) && ns > 0)
+		if (CONFIG_IS_ENABLED(OF_TRANSLATE) &&
+		    (ns > 0 || gd_size_cells_0())) {
 			return of_translate_address(np, prop);
+		}
 		else
 			return of_read_number(prop, na);
 	} else {
@@ -886,6 +925,15 @@ u64 ofnode_translate_dma_address(ofnode node, const fdt32_t *in_addr)
 		return of_translate_dma_address(ofnode_to_np(node), in_addr);
 	else
 		return fdt_translate_dma_address(gd->fdt_blob, ofnode_to_offset(node), in_addr);
+}
+
+int ofnode_get_dma_range(ofnode node, phys_addr_t *cpu, dma_addr_t *bus, u64 *size)
+{
+	if (ofnode_is_np(node))
+		return of_get_dma_range(ofnode_to_np(node), cpu, bus, size);
+	else
+		return fdt_get_dma_range(gd->fdt_blob, ofnode_to_offset(node),
+					 cpu, bus, size);
 }
 
 int ofnode_device_is_compatible(ofnode node, const char *compat)

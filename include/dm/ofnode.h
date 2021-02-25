@@ -10,6 +10,8 @@
 /* TODO(sjg@chromium.org): Drop fdtdec.h include */
 #include <fdtdec.h>
 #include <dm/of.h>
+#include <dm/of_access.h>
+#include <log.h>
 
 /* Enable checks to protect against invalid calls */
 #undef OF_CHECKS
@@ -84,7 +86,7 @@ struct ofprop {
 };
 
 /**
- * _ofnode_to_np() - convert an ofnode to a live DT node pointer
+ * ofnode_to_np() - convert an ofnode to a live DT node pointer
  *
  * This cannot be called if the reference contains an offset.
  *
@@ -127,7 +129,7 @@ static inline bool ofnode_valid(ofnode node)
 	if (of_live_active())
 		return node.np != NULL;
 	else
-		return node.of_offset != -1;
+		return node.of_offset >= 0;
 }
 
 /**
@@ -182,8 +184,8 @@ static inline bool ofnode_is_np(ofnode node)
 	 * live tree is in use.
 	 */
 	assert(!ofnode_valid(node) ||
-	       (of_live_active() ? _ofnode_to_np(node)
-				  : _ofnode_to_np(node)));
+	       (of_live_active() ? ofnode_to_np(node)
+				  : ofnode_to_np(node)));
 #endif
 	return of_live_active() && ofnode_valid(node);
 }
@@ -213,6 +215,18 @@ static inline ofnode ofnode_null(void)
 		node.np = NULL;
 	else
 		node.of_offset = -1;
+
+	return node;
+}
+
+static inline ofnode ofnode_root(void)
+{
+	ofnode node;
+
+	if (of_live_active())
+		node.np = gd_of_root();
+	else
+		node.of_offset = 0;
 
 	return node;
 }
@@ -364,6 +378,51 @@ bool ofnode_read_bool(ofnode node, const char *propname);
  */
 ofnode ofnode_find_subnode(ofnode node, const char *subnode_name);
 
+#if CONFIG_IS_ENABLED(DM_INLINE_OFNODE)
+#include <asm/global_data.h>
+
+static inline bool ofnode_is_enabled(ofnode node)
+{
+	if (ofnode_is_np(node)) {
+		return of_device_is_available(ofnode_to_np(node));
+	} else {
+		return fdtdec_get_is_enabled(gd->fdt_blob,
+					     ofnode_to_offset(node));
+	}
+}
+
+static inline ofnode ofnode_first_subnode(ofnode node)
+{
+	assert(ofnode_valid(node));
+	if (ofnode_is_np(node))
+		return np_to_ofnode(node.np->child);
+
+	return offset_to_ofnode(
+		fdt_first_subnode(gd->fdt_blob, ofnode_to_offset(node)));
+}
+
+static inline ofnode ofnode_next_subnode(ofnode node)
+{
+	assert(ofnode_valid(node));
+	if (ofnode_is_np(node))
+		return np_to_ofnode(node.np->sibling);
+
+	return offset_to_ofnode(
+		fdt_next_subnode(gd->fdt_blob, ofnode_to_offset(node)));
+}
+#else
+/**
+ * ofnode_is_enabled() - Checks whether a node is enabled.
+ * This looks for a 'status' property. If this exists, then returns true if
+ * the status is 'okay' and false otherwise. If there is no status property,
+ * it returns true on the assumption that anything mentioned should be enabled
+ * by default.
+ *
+ * @node: node to examine
+ * @return false (not enabled) or true (enabled)
+ */
+bool ofnode_is_enabled(ofnode node);
+
 /**
  * ofnode_first_subnode() - find the first subnode of a parent node
  *
@@ -381,6 +440,7 @@ ofnode ofnode_first_subnode(ofnode node);
  * has no more siblings)
  */
 ofnode ofnode_next_subnode(ofnode node);
+#endif /* DM_INLINE_OFNODE */
 
 /**
  * ofnode_get_parent() - get the ofnode's parent (enclosing ofnode)
@@ -555,12 +615,13 @@ int ofnode_parse_phandle_with_args(ofnode node, const char *list_name,
  * @node:	device tree node containing a list
  * @list_name:	property name that contains a list
  * @cells_name:	property name that specifies phandles' arguments count
+ * @cells_count: Cell count to use if @cells_name is NULL
  * @return number of phandle on success, -ENOENT if @list_name does not
  *      exist, -EINVAL if a phandle was not found, @cells_name could not
  *      be found.
  */
 int ofnode_count_phandle_with_args(ofnode node, const char *list_name,
-				   const char *cells_name);
+				   const char *cells_name, int cell_count);
 
 /**
  * ofnode_path() - find a node by full path
@@ -602,6 +663,28 @@ const char *ofnode_read_chosen_string(const char *propname);
  * @return the referenced node if present, else ofnode_null()
  */
 ofnode ofnode_get_chosen_node(const char *propname);
+
+/**
+ * ofnode_read_aliases_prop() - get the value of a aliases property
+ *
+ * This looks for a property within the /aliases node and returns its value
+ *
+ * @propname: Property name to look for
+ * @sizep: Returns size of property, or FDT_ERR_... error code if function
+ *	returns NULL
+ * @return property value if found, else NULL
+ */
+const void *ofnode_read_aliases_prop(const char *propname, int *sizep);
+
+/**
+ * ofnode_get_aliases_node() - get a referenced node from the aliases node
+ *
+ * This looks up a named property in the aliases node and uses that as a path to
+ * look up a code.
+ *
+ * @return the referenced node if present, else ofnode_null()
+ */
+ofnode ofnode_get_aliases_node(const char *propname);
 
 struct display_timing;
 /**
@@ -914,6 +997,22 @@ u64 ofnode_translate_address(ofnode node, const fdt32_t *in_addr);
  * @return the translated DMA address; OF_BAD_ADDR on error
  */
 u64 ofnode_translate_dma_address(ofnode node, const fdt32_t *in_addr);
+
+/**
+ * ofnode_get_dma_range() - get dma-ranges for a specific DT node
+ *
+ * Get DMA ranges for a specifc node, this is useful to perform bus->cpu and
+ * cpu->bus address translations
+ *
+ * @param blob		Pointer to device tree blob
+ * @param node_offset	Node DT offset
+ * @param cpu		Pointer to variable storing the range's cpu address
+ * @param bus		Pointer to variable storing the range's bus address
+ * @param size		Pointer to variable storing the range's size
+ * @return translated DMA address or OF_BAD_ADDR on error
+ */
+int ofnode_get_dma_range(ofnode node, phys_addr_t *cpu, dma_addr_t *bus,
+			 u64 *size);
 
 /**
  * ofnode_device_is_compatible() - check if the node is compatible with compat

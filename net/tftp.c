@@ -14,6 +14,7 @@
 #include <log.h>
 #include <mapmem.h>
 #include <net.h>
+#include <asm/global_data.h>
 #include <net/tftp.h>
 #include "bootp.h"
 #ifdef CONFIG_SYS_DIRECT_FLASH_TFTP
@@ -159,7 +160,8 @@ static unsigned short tftp_window_size_option = TFTP_WINDOWSIZE;
 
 static inline int store_block(int block, uchar *src, unsigned int len)
 {
-	ulong offset = block * tftp_block_size + tftp_block_wrap_offset;
+	ulong offset = block * tftp_block_size + tftp_block_wrap_offset -
+			tftp_block_size;
 	ulong newsize = offset + len;
 	ulong store_addr = tftp_load_addr + offset;
 #ifdef CONFIG_SYS_DIRECT_FLASH_TFTP
@@ -233,7 +235,8 @@ static void new_transfer(void)
 static int load_block(unsigned block, uchar *dst, unsigned len)
 {
 	/* We may want to get the final block from the previous set */
-	ulong offset = ((int)block - 1) * len + tftp_block_wrap_offset;
+	ulong offset = block * tftp_block_size + tftp_block_wrap_offset -
+		       tftp_block_size;
 	ulong tosend = len;
 
 	tosend = min(net_boot_file_size - offset, tosend);
@@ -327,6 +330,12 @@ static void tftp_complete(void)
 			time_start * 1000, "/s");
 	}
 	puts("\ndone\n");
+	if (IS_ENABLED(CONFIG_CMD_BOOTEFI)) {
+		if (!tftp_put_active)
+			efi_set_bootdev("Net", "", tftp_filename,
+					map_sysmem(tftp_load_addr, 0),
+					net_boot_file_size);
+	}
 	net_set_state(NETLOOP_SUCCESS);
 }
 
@@ -502,6 +511,7 @@ static void tftp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 				int block = ntohs(*s);
 				int ack_ok = (tftp_cur_block == block);
 
+				tftp_prev_block = tftp_cur_block;
 				tftp_cur_block = (unsigned short)(block + 1);
 				update_block_number();
 				if (ack_ok)
@@ -621,8 +631,10 @@ static void tftp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 		tftp_cur_block++;
 		tftp_cur_block %= TFTP_SEQUENCE_SIZE;
 
-		if (tftp_state == STATE_SEND_RRQ)
+		if (tftp_state == STATE_SEND_RRQ) {
 			debug("Server did not acknowledge any options!\n");
+			tftp_next_ack = tftp_windowsize;
+		}
 
 		if (tftp_state == STATE_SEND_RRQ || tftp_state == STATE_OACK ||
 		    tftp_state == STATE_RECV_WRQ) {
@@ -651,9 +663,15 @@ static void tftp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 		timeout_count_max = tftp_timeout_count_max;
 		net_set_timeout_handler(timeout_ms, tftp_timeout_handler);
 
-		if (store_block(tftp_cur_block - 1, pkt + 2, len)) {
+		if (store_block(tftp_cur_block, pkt + 2, len)) {
 			eth_halt();
 			net_set_state(NETLOOP_FAIL);
+			break;
+		}
+
+		if (len < tftp_block_size) {
+			tftp_send();
+			tftp_complete();
 			break;
 		}
 
@@ -664,11 +682,6 @@ static void tftp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 		if (tftp_cur_block == tftp_next_ack) {
 			tftp_send();
 			tftp_next_ack += tftp_windowsize;
-		}
-
-		if (len < tftp_block_size) {
-			tftp_send();
-			tftp_complete();
 		}
 		break;
 
@@ -838,9 +851,6 @@ void tftp_start(enum proto_t protocol)
 		printf("Load address: 0x%lx\n", tftp_load_addr);
 		puts("Loading: *\b");
 		tftp_state = STATE_SEND_RRQ;
-#ifdef CONFIG_CMD_BOOTEFI
-		efi_set_bootdev("Net", "", tftp_filename);
-#endif
 	}
 
 	time_start = get_timer(0);

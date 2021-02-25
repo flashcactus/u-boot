@@ -8,6 +8,7 @@
 
 #include <common.h>
 #include <log.h>
+#include <asm/global_data.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -44,4 +45,5 @@ static int log_console_emit(struct log_device *ldev, struct log_rec *rec)
 LOG_DRIVER(console) = {
 	.name	= "console",
 	.emit	= log_console_emit,
+	.flags	= LOGDF_ENABLE,
 };

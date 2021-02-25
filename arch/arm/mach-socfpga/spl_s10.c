@@ -7,6 +7,7 @@
 #include <hang.h>
 #include <init.h>
 #include <log.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/u-boot.h>
 #include <asm/utils.h>
@@ -53,11 +54,11 @@ void board_init_f(ulong dummy)
 
 	socfpga_get_managers_addr();
 
-#ifdef CONFIG_HW_WATCHDOG
 	/* Ensure watchdog is paused when debugging is happening */
 	writel(SYSMGR_WDDBG_PAUSE_ALL_CPU,
 	       socfpga_get_sysmgr_addr() + SYSMGR_SOC64_WDDBG);
 
+#ifdef CONFIG_HW_WATCHDOG
 	/* Enable watchdog before initializing the HW */
 	socfpga_per_reset(SOCFPGA_RESET(L4WD0), 1);
 	socfpga_per_reset(SOCFPGA_RESET(L4WD0), 0);
@@ -81,6 +82,7 @@ void board_init_f(ulong dummy)
 #endif
 
 	preloader_console_init();
+	print_reset_info();
 	cm_print_clock_quick_summary();
 
 	firewall_setup();

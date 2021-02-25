@@ -5,6 +5,7 @@
  */
 
 #include <common.h>
+#include <fdtdec.h>
 #include <image.h>
 #include <log.h>
 #include <malloc.h>
@@ -192,7 +193,7 @@ int optee_copy_fdt_nodes(const void *old_blob, void *new_blob)
 				ret = fdtdec_add_reserved_memory(new_blob,
 								 nodename,
 								 &carveout,
-								 NULL);
+								 NULL, true);
 				free(oldname);
 
 				if (ret < 0)
