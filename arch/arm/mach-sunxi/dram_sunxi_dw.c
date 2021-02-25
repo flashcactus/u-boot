@@ -405,10 +405,10 @@ static void mctl_set_cr(uint16_t socid, struct dram_para *para)
 	       MCTL_CR_PAGE_SIZE(para->ranks[0].page_size) |
 	       MCTL_CR_ROW_BITS(para->ranks[0].row_bits), &mctl_com->cr);
 
-	if (socid == SOCID_A64 || socid == SOCID_R40) {
+	if (para->dual_rank && (socid == SOCID_A64 || socid == SOCID_R40)) {
 		writel((para->ranks[1].bank_bits == 3 ? MCTL_CR_EIGHT_BANKS : MCTL_CR_FOUR_BANKS) |
 		       MCTL_CR_BUS_FULL_WIDTH(para->bus_full_width) |
-		       (para->dual_rank ? MCTL_CR_DUAL_RANK : MCTL_CR_SINGLE_RANK) |
+		       MCTL_CR_DUAL_RANK |
 		       MCTL_CR_PAGE_SIZE(para->ranks[1].page_size) |
 		       MCTL_CR_ROW_BITS(para->ranks[1].row_bits), &mctl_com->cr_r1);
 	}
@@ -700,8 +700,55 @@ static unsigned long mctl_calc_rank_size(struct rank_para *rank)
 	return (1UL << (rank->row_bits + rank->bank_bits)) * rank->page_size;
 }
 
+/*
+ * Because we cannot do mctl_phy_init(PIR_QSGATE) on R40 now (which leads
+ * to failure), it's needed to detect the rank count of R40 in another way.
+ *
+ * The code here is modelled after time_out_detect() in BSP, which tries to
+ * access the memory and check for error code.
+ *
+ * TODO: auto detect half DQ width here
+ */
+static void mctl_r40_detect_rank_count(struct dram_para *para)
+{
+	ulong rank1_base = (ulong) CONFIG_SYS_SDRAM_BASE +
+			   mctl_calc_rank_size(&para->ranks[0]);
+	struct sunxi_mctl_ctl_reg * const mctl_ctl =
+			(struct sunxi_mctl_ctl_reg *)SUNXI_DRAM_CTL0_BASE;
+
+	/* Enable read time out */
+	setbits_le32(&mctl_ctl->pgcr[0], 0x1 << 25);
+
+	(void) readl((void *) rank1_base);
+	udelay(10);
+
+	if (readl(&mctl_ctl->pgsr[0]) & (0x1 << 13)) {
+		clrsetbits_le32(&mctl_ctl->dtcr, 0xf << 24, 0x1 << 24);
+		para->dual_rank = 0;
+	}
+
+	/* Reset PHY FIFO to clear it */
+	clrbits_le32(&mctl_ctl->pgcr[0], 0x1 << 26);
+	udelay(100);
+	setbits_le32(&mctl_ctl->pgcr[0], 0x1 << 26);
+
+	/* Clear error status */
+	setbits_le32(&mctl_ctl->pgcr[0], 0x1 << 24);
+
+	/* Clear time out flag */
+	clrbits_le32(&mctl_ctl->pgsr[0], 0x1 << 13);
+
+	/* Disable read time out */
+	clrbits_le32(&mctl_ctl->pgcr[0], 0x1 << 25);
+}
+
 static void mctl_auto_detect_dram_size(uint16_t socid, struct dram_para *para)
 {
+	if (socid == SOCID_R40) {
+		mctl_r40_detect_rank_count(para);
+		mctl_set_cr(socid, para);
+	}
+
 	mctl_auto_detect_dram_size_rank(socid, para, (ulong)CONFIG_SYS_SDRAM_BASE, &para->ranks[0]);
 
 	if ((socid == SOCID_A64 || socid == SOCID_R40) && para->dual_rank) {
@@ -852,9 +899,6 @@ unsigned long sunxi_dram_init(void)
 	uint16_t socid = SOCID_H3;
 #elif defined(CONFIG_MACH_SUN8I_R40)
 	uint16_t socid = SOCID_R40;
-	/* Currently we cannot support R40 with dual rank memory */
-  /* but we have to */
-	/* para.dual_rank = 0; */
 #elif defined(CONFIG_MACH_SUN8I_V3S)
 	uint16_t socid = SOCID_V3S;
 #elif defined(CONFIG_MACH_SUN50I)
