@@ -46,7 +46,7 @@
 	regulator-max-microvolt = <2500000>;
 	regulator-name = "vcc-pa";
 };
-//bringing 2500000uV
+//kernel states 2500000uV here
 
 &reg_dcdc1 {
 	regulator-always-on;
@@ -55,7 +55,7 @@
 	regulator-name = "vcc-3v3";
 };
 
-//I don't know whether these really belong here or 
+//I don't know whether these really belong here
 &reg_dldo1 {
 	regulator-always-on;
 	regulator-min-microvolt = <3300000>;
