@@ -16,6 +16,10 @@
 	aliases {
 		ethernet0 = &gmac;
 		serial0 = &uart0;
+    serial2 = &uart2;
+    serial3 = &uart3;
+    serial4 = &uart4;
+    serial7 = &uart7;
 	};
 
 	chosen {
@@ -206,10 +210,24 @@
 	status = "okay";
 };
 
+&pio {
+    uart0_pb_pins: uart0-pb-pins {
+      pins = "PB22", "PB23";
+      function = "uart0";
+    };
+};
+
 &uart0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart0_pb_pins>;
 	status = "okay";
+};
+
+&uart2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart2_pi_pins>, <&uart2_rts_cts_pi_pins>;
+  uart-has-rtscts;
+  status = "okay";
 };
 
 &uart3 {
@@ -218,17 +236,29 @@
 	uart-has-rtscts;
 	status = "okay";
 
-	bluetooth {
-		compatible = "brcm,bcm43438-bt";
-		clocks = <&ccu CLK_OUTA>;
-		clock-names = "lpo";
-		vbat-supply = <&reg_dldo2>;
-		vddio-supply = <&reg_dldo1>;
-		device-wakeup-gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
-		/* TODO host wake line connected to PMIC GPIO pins */
-		shutdown-gpios = <&pio 7 12 GPIO_ACTIVE_HIGH>; /* PH12 */
-		max-speed = <1500000>;
-	};
+	/* bluetooth { */
+	/* 	compatible = "brcm,bcm43438-bt"; */
+	/* 	clocks = <&ccu CLK_OUTA>; */
+	/* 	clock-names = "lpo"; */
+	/* 	vbat-supply = <&reg_dldo2>; */
+	/* 	vddio-supply = <&reg_dldo1>; */
+	/* 	device-wakeup-gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>; /\* PG11 *\/ */
+	/* 	/\* TODO host wake line connected to PMIC GPIO pins *\/ */
+	/* 	shutdown-gpios = <&pio 7 12 GPIO_ACTIVE_HIGH>; /\* PH12 *\/ */
+	/* 	max-speed = <1500000>; */
+	/* }; */
+};
+
+&uart4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart4_pg_pins>;
+  status = "okay";
+};
+
+&uart7 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart7_pi_pins>;
+  status = "okay";
 };
 
 &usbphy {

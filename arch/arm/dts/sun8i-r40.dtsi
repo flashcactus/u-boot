@@ -395,6 +395,16 @@
 				function = "uart0";
 			};
 
+			uart2_pi_pins: uart2-pi-pins {
+				pins = "PI18", "PI19";
+				function = "uart2";
+			};
+
+			uart2_rts_cts_pi_pins: uart2-rts-cts-pi-pins{
+				pins = "PI16", "PI17";
+				function = "uart2";
+			};
+
 			uart3_pg_pins: uart3-pg-pins {
 				pins = "PG6", "PG7";
 				function = "uart3";
@@ -403,6 +413,16 @@
 			uart3_rts_cts_pg_pins: uart3-rts-cts-pg-pins {
 				pins = "PG8", "PG9";
 				function = "uart3";
+			};
+
+			uart4_pg_pins: uart4-pg-pins {
+				pins = "PG10", "PG11";
+				function = "uart4";
+			};
+
+			uart7_pi_pins: uart7-pi-pins {
+				pins = "PI20", "PI21";
+				function = "uart7";
 			};
 		};
 
