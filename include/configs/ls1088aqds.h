@@ -26,7 +26,7 @@ unsigned long get_board_ddr_clk(void);
 #define CONFIG_DDR_CLK_FREQ		100000000
 #else
 #define CONFIG_QIXIS_I2C_ACCESS
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 #define CONFIG_SYS_I2C_EARLY_INIT
 #endif
 #define CONFIG_SYS_CLK_FREQ		get_board_sys_clk()
@@ -325,12 +325,6 @@ unsigned long get_board_ddr_clk(void);
 
 #define CONFIG_VOL_MONITOR_LTC3882_SET
 #define CONFIG_VOL_MONITOR_LTC3882_READ
-
-/* PM Bus commands code for LTC3882*/
-#define PMBUS_CMD_PAGE                  0x0
-#define PMBUS_CMD_READ_VOUT             0x8B
-#define PMBUS_CMD_PAGE_PLUS_WRITE       0x05
-#define PMBUS_CMD_VOUT_COMMAND          0x21
 
 #define PWM_CHANNEL0                    0x0
 
