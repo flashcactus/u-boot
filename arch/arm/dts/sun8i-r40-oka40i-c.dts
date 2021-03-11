@@ -8,6 +8,7 @@
 #include "sun8i-r40-feta40i.dtsi"
 
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/leds/common.h>
 
 / {
 	model = "Forlinx OKA40i-C";
@@ -40,16 +41,17 @@
 	leds {
 		compatible = "gpio-leds";
 
-		user-led-5 {
-			label = "oka40i:led5:user";
-			gpios = <&pio 7 26 GPIO_ACTIVE_LOW>;
+		led-5 {
+			gpios = <&pio 7 26 GPIO_ACTIVE_LOW>; /* PH26 */
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
 		};
 
-		user-led-6 {
-			label = "oka40i:led6:user";
-			gpios = <&pio 8 15 GPIO_ACTIVE_LOW>;
+		led-6 {
+			gpios = <&pio 8 15 GPIO_ACTIVE_LOW>; /* PI15 */
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
 		};
-
 	};
 
 	reg_vcc5v0: vcc5v0 {
@@ -125,11 +127,12 @@
 	status = "okay";
 };
 
-&mmc1 {
+// TODO: make mmc3 great again
+&mmc3 {
 	vmmc-supply = <&reg_dcdc1>;
 	vqmmc-supply = <&reg_dcdc1>;
-	mmc-pwrseq = <&wifi_pwrseq>;
 	bus-width = <4>;
+	cd-gpios = <&pio 8 10 GPIO_ACTIVE_LOW>; // PI10
 	status = "okay";
 };
 
@@ -157,17 +160,16 @@
 &reg_dcdc2 {
 	regulator-always-on;
 	regulator-min-microvolt = <1100000>;
-	regulator-max-microvolt = <1160000>;
+	regulator-max-microvolt = <1100000>;
 	regulator-name = "vdd-cpu";
-};//1100000uV
+};
 
 &reg_dcdc3 {
 	regulator-always-on;
 	regulator-min-microvolt = <1100000>;
-	regulator-max-microvolt = <1200000>;
+	regulator-max-microvolt = <1100000>;
 	regulator-name = "vdd-sys";
-};//1100000uV
-
+};
 
 &reg_dcdc5 {
 	regulator-always-on;
@@ -177,28 +179,18 @@
 };
 
 &reg_dldo2 {
-	// regulator-always-on;
 	regulator-min-microvolt = <3300000>;
 	regulator-max-microvolt = <3300000>;
-	regulator-name = "vcc-wifi"; // ?
-};
-
-&reg_dldo3 {
-	// regulator-always-on;
-	regulator-min-microvolt = <3300000>;
-	regulator-max-microvolt = <3300000>;
-	regulator-name = "vcc-wifi-2"; // ?
+	regulator-name = "vcc-wifi";
 };
 
 &reg_eldo2 {
-	regulator-always-on;
 	regulator-min-microvolt = <1200000>;
 	regulator-max-microvolt = <1200000>;
 	regulator-name = "vdd1v2-sata";
 };
 
 &reg_eldo3 {
-	regulator-always-on;
 	regulator-min-microvolt = <2800000>;
 	regulator-max-microvolt = <2800000>;
 	regulator-name = "vcc-pe";
@@ -208,12 +200,6 @@
 	status = "okay";
 };
 
-&pio {
-    uart0_pb_pins: uart0-pb-pins {
-      pins = "PB22", "PB23";
-      function = "uart0";
-    };
-};
 
 &uart0 {
 	pinctrl-names = "default";

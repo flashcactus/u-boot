@@ -42,10 +42,9 @@
 &reg_aldo2 {
 	regulator-always-on;
 	regulator-min-microvolt = <1800000>;
-	regulator-max-microvolt = <2500000>;
+	regulator-max-microvolt = <1800000>;
 	regulator-name = "vcc-pa";
 };
-//kernel states 2500000uV here
 
 &reg_dcdc1 {
 	regulator-always-on;
