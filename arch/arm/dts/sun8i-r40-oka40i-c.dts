@@ -20,6 +20,7 @@
 		serial2 = &uart2;
 		serial3 = &uart3;
 		serial4 = &uart4;
+		serial5 = &uart5; /* RS485 */
 		serial7 = &uart7;
 	};
 
@@ -224,6 +225,12 @@
 &uart4 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart4_pg_pins>;
+	status = "okay";
+};
+
+&uart5 { /* RS485 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart5_ph_pins>;
 	status = "okay";
 };
 
