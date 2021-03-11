@@ -4,7 +4,6 @@
 //  Copyright (C) 2017 Chen-Yu Tsai <wens@csie.org>
 //  Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
 
-/dts-v1/;
 
 #include "sun8i-r40.dtsi"
 
@@ -25,7 +24,7 @@
 	vmmc-supply = <&reg_dcdc1>;
 	vqmmc-supply = <&reg_aldo2>;
 	bus-width = <8>;
-  non-removable;
+	non-removable;
 	status = "okay";
 };
 
@@ -55,17 +54,16 @@
 	regulator-name = "vcc-3v3";
 };
 
-//I don't know whether these really belong here
 &reg_dldo1 {
 	regulator-always-on;
 	regulator-min-microvolt = <3300000>;
 	regulator-max-microvolt = <3300000>;
-	regulator-name = "vcc-wifi-io"; // ?
+	regulator-name = "vcc-wifi-io"; 
 };
 
 &reg_dldo4 {
 	regulator-always-on;
 	regulator-min-microvolt = <2500000>;
 	regulator-max-microvolt = <2500000>;
-	regulator-name = "vdd2v5-sata"; // ?
+	regulator-name = "vdd2v5-sata";
 };
