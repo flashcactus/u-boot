@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+ OR MIT
 // Copyright (C) 2021 Ivan Uvarov <i.uvarov@cognitivepilot.com>
-// Based on the sun8i-r40-bananapi-m2-ultra.dts, which is: 
+// Based on the sun8i-r40-bananapi-m2-ultra.dts, which is:
 //	Copyright (C) 2017 Chen-Yu Tsai <wens@csie.org>
 //	Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
 
@@ -12,7 +12,7 @@
 
 / {
 	model = "Forlinx OKA40i-C";
-	compatible = "forlinx,oka40i-c", "allwinner,sun8i-r40";
+	compatible = "forlinx,oka40i-c", "forlinx,feta40i-c", "allwinner,sun8i-r40";
 
 	aliases {
 		ethernet0 = &gmac;
@@ -42,9 +42,9 @@
 	leds {
 		compatible = "gpio-leds";
 
-		led-5 {
+		led-5 { /* this is how the leds are labeled on the board */
 			gpios = <&pio 7 26 GPIO_ACTIVE_LOW>; /* PH26 */
-			color = <LED_COLOR_ID_BLUE>;
+			color = <LED_COLOR_ID_GREEN>;
 			function = LED_FUNCTION_STATUS;
 		};
 
@@ -114,11 +114,9 @@
 	};
 };
 
-
 &i2c2 {
 	status = "okay";
 };
-
 
 &mmc0 {
 	vmmc-supply = <&reg_dcdc1>;
@@ -128,7 +126,6 @@
 	status = "okay";
 };
 
-// TODO: make mmc3 great again
 &mmc3 {
 	vmmc-supply = <&reg_dcdc1>;
 	vqmmc-supply = <&reg_dcdc1>;
@@ -145,38 +142,10 @@
 	status = "okay";
 };
 
-&reg_aldo3 {
-	regulator-always-on;
-	regulator-min-microvolt = <3000000>;
-	regulator-max-microvolt = <3000000>;
-	regulator-name = "avcc";
-};
-
 &reg_dc1sw {
 	regulator-min-microvolt = <3300000>;
 	regulator-max-microvolt = <3300000>;
 	regulator-name = "vcc-lcd";
-};
-
-&reg_dcdc2 {
-	regulator-always-on;
-	regulator-min-microvolt = <1100000>;
-	regulator-max-microvolt = <1100000>;
-	regulator-name = "vdd-cpu";
-};
-
-&reg_dcdc3 {
-	regulator-always-on;
-	regulator-min-microvolt = <1100000>;
-	regulator-max-microvolt = <1100000>;
-	regulator-name = "vdd-sys";
-};
-
-&reg_dcdc5 {
-	regulator-always-on;
-	regulator-min-microvolt = <1500000>;
-	regulator-max-microvolt = <1500000>;
-	regulator-name = "vcc-dram";
 };
 
 &reg_dldo2 {
@@ -185,22 +154,9 @@
 	regulator-name = "vcc-wifi";
 };
 
-&reg_eldo2 {
-	regulator-min-microvolt = <1200000>;
-	regulator-max-microvolt = <1200000>;
-	regulator-name = "vdd1v2-sata";
-};
-
-&reg_eldo3 {
-	regulator-min-microvolt = <2800000>;
-	regulator-max-microvolt = <2800000>;
-	regulator-name = "vcc-pe";
-};
-
 &tcon_tv0 {
 	status = "okay";
 };
-
 
 &uart0 {
 	pinctrl-names = "default";
