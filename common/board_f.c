@@ -949,8 +949,19 @@ void board_init_f(ulong boot_flags)
 	gd->flags = boot_flags;
 	gd->have_console = 0;
 
-	if (initcall_run_list(init_sequence_f))
-		hang();
+	if (initcall_run_list(init_sequence_f)){
+    #ifndef CONFIG_SPL_BUILD
+      asm volatile(
+                   "mov r7, #0x1c00000\n"
+                   "orr r7, r7, #0x28000\n"
+                   " mov r8, #'('\n"
+                   "str r8, [r7]\n" );//dbg/rm
+    #endif
+		hang();}
+
+#ifndef CONFIG_SPL_BUILD
+  asm volatile("mov r8, #')'\n" "str r8, [r7]\n" );//dbg/rm
+#endif
 
 #if !defined(CONFIG_ARM) && !defined(CONFIG_SANDBOX) && \
 		!defined(CONFIG_EFI_APP) && !CONFIG_IS_ENABLED(X86_64) && \

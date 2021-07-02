@@ -25,11 +25,20 @@ __weak void gtbus_init(void)
 
 int clock_init(void)
 {
+  asm volatile("mov r8, #' '\n" "str r8, [r7]\n" );//dbg/rm
 #ifdef CONFIG_SPL_BUILD
+  asm volatile("mov r8, #'c'\n" "str r8, [r7]\n" );//dbg/rm
 	clock_init_safe();
 	gtbus_init();
 #endif
+  #ifndef CONFIG_SPL_BUILD
+  asm volatile("mov r8, #'k'\n" "str r8, [r7]\n" );//dbg/rm
+  #endif
 	clock_init_uart();
+#ifndef CONFIG_SPL_BUILD
+  asm volatile("mov r8, #'k'\n" "str r8, [r7]\n" );//dbg/rm
+#endif
+  //asm volatile("mov r8, #'u'\n" "str r8, [r7]\n" );//dbg/rm
 	clock_init_sec();
 
 	return 0;

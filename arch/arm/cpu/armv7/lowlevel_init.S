@@ -25,6 +25,10 @@ WEAK(lowlevel_init)
 	/*
 	 * Setup a temporary stack. Global data is not available yet.
 	 */
+  //*//dbg
+  mov r8, #'l'
+  str r8, [r7] 
+  //*/
 #if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_STACK)
 	ldr	sp, =CONFIG_SPL_STACK
 #else
@@ -64,7 +68,23 @@ WEAK(lowlevel_init)
 	 * this init in the SPL board_init_f() function which is called
 	 * immediately after this.
 	 */
+  //*//dbg
+  mov r8, #'L'
+  str r8, [r7] 
+  //*/
 	bl	s_init
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r8, #'m'
+  str r8, [r7] 
+  //*/
+#endif
 	pop	{ip, pc}
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r8, #'E'
+  str r8, [r7] 
+  //*/
+#endif
 ENDPROC(lowlevel_init)
 .popsection

@@ -47,6 +47,7 @@ void clock_init_safe(void)
 
 void clock_init_uart(void)
 {
+  asm volatile("mov r8, #'U'\n" "str r8, [r7]\n" );//dbg/rm
 	struct sunxi_ccm_reg *const ccm =
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
 

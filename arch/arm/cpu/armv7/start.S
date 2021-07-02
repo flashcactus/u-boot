@@ -28,6 +28,7 @@
  *
  *************************************************************************/
 
+
 	.globl	reset
 	.globl	save_boot_params_ret
 	.type   save_boot_params_ret,%function
@@ -82,11 +83,30 @@ switch_to_hypervisor_ret:
 	/* the mask ROM code should have PLL and others stable */
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
 #ifdef CONFIG_CPU_V7A
+  //*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  mov r8, #'c'
+  str r8, [r7] 
+//*/
 	bl	cpu_init_cp15
+  //*//dbg
+  mov r8, #'\r'
+  str r8, [r7] 
+  //*/
 #endif
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT_ONLY
 	bl	cpu_init_crit
 #endif
+#endif
+
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  mov r8, #'!'
+  str r8, [r7] 
+  //*/
 #endif
 
 	bl	_main
@@ -140,6 +160,13 @@ ENTRY(cpu_init_cp15)
 	/*
 	 * Invalidate L1 I/D
 	 */
+  /*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  */
+  mov r8, #'C'
+  str r8, [r7] 
+//*/
 	mov	r0, #0			@ set up for MCR
 	mcr	p15, 0, r0, c8, c7, 0	@ invalidate TLBs
 	mcr	p15, 0, r0, c7, c5, 0	@ invalidate icache
@@ -161,6 +188,10 @@ ENTRY(cpu_init_cp15)
 	orr	r0, r0, #0x00001000	@ set bit 12 (I) I-cache
 #endif
 	mcr	p15, 0, r0, c1, c0, 0
+  //*//dbg
+  mov r8, #'d'
+  str r8, [r7] 
+  //*/
 
 #ifdef CONFIG_ARM_ERRATA_716044
 	mrc	p15, 0, r0, c1, c0, 0	@ read system control register
@@ -196,6 +227,10 @@ ENTRY(cpu_init_cp15)
 	orr     r0, r0, #1 << 22	@ set bit #22
 	mcr     p15, 0, r0, c15, c0, 1	@ write diagnostic register
 #endif
+  //*//dbg
+  mov r8, #'e'
+  str r8, [r7] 
+  //*/
 
 	mov	r5, lr			@ Store my Caller
 	mrc	p15, 0, r1, c0, c0, 0	@ r1 has Read Main ID Register (MIDR)
@@ -229,6 +264,10 @@ ENTRY(cpu_init_cp15)
 skip_errata_798870:
 #endif
 
+  //*//dbg
+  mov r8, #'f'
+  str r8, [r7] 
+  //*/
 #ifdef CONFIG_ARM_ERRATA_801819
 	cmp	r2, #0x24		@ Applies to lt including R2p4
 	bgt	skip_errata_801819      @ skip if not affected rev
@@ -317,6 +356,10 @@ skip_errata_801819:
 	mcr	p15, 0, r0, c15, c0, 1	@ write diagnostic register
 #endif
 
+  //*//dbg
+  mov r8, #'\n'
+  str r8, [r7] 
+  //*/
 	mov	pc, r5			@ back to my caller
 ENDPROC(cpu_init_cp15)
 
@@ -337,6 +380,14 @@ ENTRY(cpu_init_crit)
 	 * basic memory. Go here to bump up clock rate and handle
 	 * wake up conditions.
 	 */
+  //*//dbg
+  mov r8, #'s'
+  str r8, [r7] 
+  //*/
 	b	lowlevel_init		@ go setup pll,mux,memory
+  //*//dbg
+  mov r8, #'t'
+  str r8, [r7] 
+  //*/
 ENDPROC(cpu_init_crit)
 #endif

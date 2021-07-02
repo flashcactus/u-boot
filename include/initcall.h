@@ -44,7 +44,17 @@ static inline int initcall_run_list(const init_fnc_t init_sequence[])
 			debug("initcall: %p\n", (char *)*init_fnc_ptr - reloc_ofs);
 
 		ret = (*init_fnc_ptr)();
+    asm volatile(
+                 "mov r7, #0x1c00000\n"
+                 "orr r7, r7, #0x28000\n"
+                 " mov r8, #'!'\n"
+                 "str r8, [r7]\n" );//dbg/rm
 		if (ret) {
+      asm volatile(
+                   "mov r7, #0x1c00000\n"
+                   "orr r7, r7, #0x28000\n"
+                   " mov r8, #'/'\n"
+                   "str r8, [r7]\n" );//dbg/rm
 			printf("initcall sequence %p failed at call %p (err=%d)\n",
 			       init_sequence,
 			       (char *)*init_fnc_ptr - reloc_ofs, ret);

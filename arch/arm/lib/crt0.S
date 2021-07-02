@@ -101,6 +101,15 @@ ENTRY(_main)
 #else
 	ldr	r0, =(CONFIG_SYS_INIT_SP_ADDR)
 #endif
+
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  mov r8, #'\n'
+  str r8, [r7] 
+#endif
+
 	bic	r0, r0, #7	/* 8-byte alignment for ABI compliance */
 	mov	sp, r0
 	bl	board_init_f_alloc_reserve
@@ -109,13 +118,41 @@ ENTRY(_main)
 	mov	r9, r0
 	bl	board_init_f_init_reserve
 
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r8, #'\r'
+  str r8, [r7] 
+#endif
+
 #if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_EARLY_BSS)
 	CLEAR_BSS
 #endif
 
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  mov r8, #'0'
+  str r8, [r7] 
+#endif
+
 	mov	r0, #0
+  
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r8, #'0'
+  str r8, [r7] 
+#endif
+
 	bl	board_init_f
 
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  mov r8, #'1'
+  str r8, [r7] 
+#endif
 #if ! defined(CONFIG_SPL_BUILD)
 
 /*
@@ -129,6 +166,13 @@ ENTRY(_main)
 	mov	sp, r0
 	ldr	r9, [r9, #GD_NEW_GD]		/* r9 <- gd->new_gd */
 
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  mov r8, #'2'
+  str r8, [r7] 
+#endif
 	adr	lr, here
 	ldr	r0, [r9, #GD_RELOC_OFF]		/* r0 = gd->reloc_off */
 	add	lr, lr, r0
@@ -142,11 +186,25 @@ here:
  * now relocate vectors
  */
 
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  mov r8, #'3'
+  str r8, [r7] 
+#endif
 	bl	relocate_vectors
 
 /* Set up final (full) environment */
 
 	bl	c_runtime_cpu_setup	/* we still call old routine here */
+#endif
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  mov r8, #'4'
+  str r8, [r7] 
 #endif
 #if !defined(CONFIG_SPL_BUILD) || CONFIG_IS_ENABLED(FRAMEWORK)
 
@@ -177,6 +235,13 @@ here:
 	ldr	pc, =board_init_r	/* this is auto-relocated! */
 #endif
 	/* we should not return here. */
+#endif
+#ifndef CONFIG_SPL_BUILD
+  //*//dbg
+  mov r7, #0x1c00000
+  orr r7, r7, #0x28000
+  mov r8, #'5'
+  str r8, [r7] 
 #endif
 
 ENDPROC(_main)
